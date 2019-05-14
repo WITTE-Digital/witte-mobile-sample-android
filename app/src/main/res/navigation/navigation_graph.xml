@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/navigation_graph"
+    app:startDestination="@id/mainFragment">
+
+    <fragment
+        android:id="@+id/mainFragment"
+        android:name="digital.witte.mobile.sample.MainFragment"
+        android:label="main_fragment"
+        tools:layout="@layout/main_fragment" >
+        <action
+            android:id="@+id/action_mainFragment_to_onboardingFragment"
+            app:destination="@id/onboardingFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/authenticationFragment"
+        android:name="digital.witte.mobile.sample.ui.auth.AuthenticationFragment"
+        android:label="Authentication"
+        tools:layout="@layout/fragment_authentication" />
+    <fragment
+        android:id="@+id/onboardingFragment"
+        android:name="digital.witte.mobile.sample.ui.prerequisities.PrerequisitiesFragment"
+        android:label="Prerequisities"
+        tools:layout="@layout/fragment_onboarding">
+        <action
+            android:id="@+id/action_onboardingFragment_to_authenticationFragment"
+            app:destination="@id/authenticationFragment" />
+    </fragment>
+</navigation>
