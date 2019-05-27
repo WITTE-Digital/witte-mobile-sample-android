@@ -8,6 +8,43 @@ The WITTE mobile sample for Android is a sample Android project illustrating the
 * Trigger (open/close) a box
 
 ## Getting Started
+
+### Add your WITTE Customer ID, SDK Key and Subscription Key 
+
+```java
+// App.java
+
+/**
+ * Your WITTE Customer Id.
+ * TODO: Add your WITTE Customer Id here.
+ */
+private final static int CustomerId = -1;
+
+/**
+ * Your WITTE SDK Key.
+ * TODO: Add your WITTE SDK Key here.
+ */
+private final static String SdkKey = "Todo: Add your WITTE sdk key here";
+
+/**
+ * Your WITTE Subscription Key.
+ * TODO: Add your WITTE Subscription Key here.
+ */
+private final static String SubscriptionKey = "Todo: Add your WITTE subscription key here";
+```
+
+### Add a WITTE User ID
+For the sake of simplicity this sample app uses a single user ID which is hard coded in the App class. Before you can actually use this sample app to open and close flinkey boxes you need to create a user in the WITTE backend and assign the constant WitteUserId with your users ID.  
+```java
+// App.java
+
+/**
+ * User Id of one specific WITTE user (this id needs to be retrieved at runtime in production apps)
+ * TODO: Add your WITTE User Id here.
+ */
+public final static int WitteUserId = -1;
+```
+
 ### Authentication
 A user needs to be authenticated with the Tapkey backend via the Tapkey Mobile Library. This is achived using a Java Web Token - the idToken - that is retrieved from the Tapkey backend and passed on to the Tapkey Mobile Library.
 
@@ -190,4 +227,3 @@ _bleLockManager
         });
     }
 ```
-## Get Help

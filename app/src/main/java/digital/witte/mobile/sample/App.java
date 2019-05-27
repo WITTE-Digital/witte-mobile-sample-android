@@ -23,11 +23,26 @@ public class App extends Application implements TapkeyAppContext {
     private AndroidTapkeyServiceFactory _tapkeyServiceFactory;
 
     /**
+     * Your WITTE Customer Id.
+     * TODO: Add your WITTE Customer Id here.
+     */
+    private final static int CustomerId = -1;
+
+    /**
+     * Your WITTE SDK Key.
+     * TODO: Add your WITTE SDK Key here.
+     */
+    private final static String SdkKey = "Todo: Add your WITTE sdk key here";
+
+    /**
+     * Your WITTE Subscription Key.
+     * TODO: Add your WITTE Subscription Key here.
+     */
+    private final static String SubscriptionKey = "Todo: Add your WITTE subscription key here";
+
+    /**
      * Customer specific configuration
      */
-    private final static int CustomerId = Integer.parseInt(BuildConfig.WITTE_CUSTOMER_ID);
-    private final static String SdkKey = BuildConfig.WITTE_SDK_KEY;
-    private final static String SubscriptionKey = BuildConfig.WITTE_SUBSCRIPTION_KEY;
     final static Configuration WitteConfiguration = new Configuration(
             CustomerId,
             SdkKey,
@@ -35,8 +50,9 @@ public class App extends Application implements TapkeyAppContext {
 
     /**
      * User Id of one specific WITTE user (this needs to be retrieved at runtime in production apps)
+     * TODO: Add your WITTE User Id here.
      */
-    public final static int WitteUserId = 30;
+    public final static int WitteUserId = -1;
 
     @Override
     public void onCreate() {
