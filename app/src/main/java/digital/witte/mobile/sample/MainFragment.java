@@ -2,9 +2,7 @@ package digital.witte.mobile.sample;
 
 import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
-import android.content.Context;
 import android.content.pm.PackageManager;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -20,21 +18,20 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import net.tpky.mc.AndroidTapkeyServiceFactory;
-import net.tpky.mc.concurrent.CancellationTokens;
-import net.tpky.mc.manager.BleLockManager;
-import net.tpky.mc.manager.CommandExecutionFacade;
-import net.tpky.mc.manager.KeyManager;
-import net.tpky.mc.manager.NotificationManager;
-import net.tpky.mc.manager.UserManager;
-import net.tpky.mc.model.CommandResult;
-import net.tpky.mc.model.Identity;
-import net.tpky.mc.model.User;
-import net.tpky.mc.model.webview.CachedKeyInformation;
-import net.tpky.mc.utils.Func1;
-import net.tpky.mc.utils.ObserverRegistration;
+import com.tapkey.mobile.TapkeyServiceFactory;
+import com.tapkey.mobile.ble.BleLockCommunicator;
+import com.tapkey.mobile.ble.BleLockScanner;
+import com.tapkey.mobile.concurrent.CancellationToken;
+import com.tapkey.mobile.concurrent.CancellationTokens;
+import com.tapkey.mobile.manager.CommandExecutionFacade;
+import com.tapkey.mobile.manager.KeyManager;
+import com.tapkey.mobile.manager.NotificationManager;
+import com.tapkey.mobile.manager.UserManager;
+import com.tapkey.mobile.model.CommandResult;
+import com.tapkey.mobile.model.KeyDetails;
+import com.tapkey.mobile.utils.Func1;
+import com.tapkey.mobile.utils.ObserverRegistration;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,7 +39,6 @@ import digital.witte.wittemobilelibrary.Configuration;
 import digital.witte.wittemobilelibrary.box.BoxFeedback;
 import digital.witte.wittemobilelibrary.box.BoxIdConverter;
 import digital.witte.wittemobilelibrary.box.BoxState;
-import digital.witte.wittemobilelibrary.net.IdTokenRequest;
 
 public class MainFragment extends Fragment {
 
@@ -56,14 +52,19 @@ public class MainFragment extends Fragment {
     private TextView _tvUserId;
     private EditText _tvBoxId;
     private Button _btnTriggerLock;
+    private Button _btnLogin;
+    private Button _btnLogout;
 
-    private BleLockManager _bleLockManager;
+    private BleLockCommunicator _bleBleLockCommunicator;
+    private BleLockScanner _bleLockScanner;
     private KeyManager _keyManager;
     private CommandExecutionFacade _commandExecutionFacade;
     private UserManager _userManager;
     private NotificationManager _notificationManager;
     private ObserverRegistration _keyUpdateObserverRegistration;
-    private ArrayList<CachedKeyInformation> _keys = new ArrayList<>();
+    private ObserverRegistration _foregroundScanRegistration;
+    private ArrayList<KeyDetails> _keys = new ArrayList<>();
+    private ProgressDialog _progressDialog;
 
     @Nullable
     @Override
@@ -78,16 +79,17 @@ public class MainFragment extends Fragment {
         _tvSdkKey = view.findViewById(R.id.main_frag_tv_sdk_key);
         _tvUserId = view.findViewById(R.id.main_frag_tv_user_id);
 
-        Button _btnAuthenticate = view.findViewById(R.id.main_frag_btn_authenticate);
-        _btnAuthenticate.setOnClickListener(button -> authenticate());
+        _btnLogin = view.findViewById(R.id.main_frag_btn_authenticate);
+        _btnLogin.setOnClickListener(button -> login());
+
+        _btnLogout = view.findViewById(R.id.main_frag_btn_logout);
+        _btnLogout.setOnClickListener(button -> logout());
 
         _tvBoxId = view.findViewById(R.id.main_frag_et_box_id);
         _tvBoxId.setHint("e.g. C1-1F-8E-7C");
+
         _btnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
         _btnTriggerLock.setOnClickListener(button -> triggerLock());
-
-        _tvBoxId.setEnabled(false);
-        _btnTriggerLock.setEnabled(false);
 
         return view;
     }
@@ -97,8 +99,9 @@ public class MainFragment extends Fragment {
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        AndroidTapkeyServiceFactory serviceFactory = ((App) getActivity().getApplication()).getTapkeyServiceFactory();
-        _bleLockManager = serviceFactory.getBleLockManager();
+        TapkeyServiceFactory serviceFactory = ((App) getActivity().getApplication()).getTapkeyServiceFactory();
+        _bleLockScanner = serviceFactory.getBleLockScanner();
+        _bleBleLockCommunicator = serviceFactory.getBleLockCommunicator();
         _keyManager = serviceFactory.getKeyManager();
         _commandExecutionFacade = serviceFactory.getCommandExecutionFacade();
         _userManager = serviceFactory.getUserManager();
@@ -125,8 +128,8 @@ public class MainFragment extends Fragment {
             }
         }
         else {
-            if (null != _bleLockManager) {
-                _bleLockManager.startForegroundScan();
+            if(null == _foregroundScanRegistration){
+                _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
             }
         }
 
@@ -135,18 +138,21 @@ public class MainFragment extends Fragment {
         if (_keyUpdateObserverRegistration == null) {
             _keyUpdateObserverRegistration = _keyManager
                     .getKeyUpdateObservable()
-                    .addObserver(aVoid -> onKeyUpdate(false));
+                    .addObserver(aVoid -> onKeyUpdate());
         }
 
-        onKeyUpdate(true);
+        onKeyUpdate();
+
+        updateUI();
     }
 
     @Override
     public void onPause() {
         super.onPause();
 
-        if (null != _bleLockManager) {
-            _bleLockManager.stopForegroundScan();
+        if(null != _foregroundScanRegistration){
+            _foregroundScanRegistration.close();
+            _foregroundScanRegistration = null;
         }
     }
 
@@ -155,47 +161,126 @@ public class MainFragment extends Fragment {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
-    private void onKeyUpdate(boolean forceUpdate) {
+    private void onKeyUpdate() {
+        if(isUserLoggedIn()){
+            // query for this user's keys asynchronously
+            String userId = _userManager.getUsers().get(0);
+            _keyManager.queryLocalKeysAsync(userId, CancellationTokens.None)
+                    // when completed with success, continue on the UI thread
+                    .continueOnUi((Func1<List<KeyDetails>, Void, Exception>) cachedKeyInformations -> {
+                        _keys.clear();
+                        _keys.addAll(cachedKeyInformations);
 
-        // We only support a single user today, so the first user is the only user.
-        User firstUser = _userManager.getFirstUser();
-        if (null == firstUser) {
-            return;
+                        return null;
+                    })
+                    // handle async exceptions
+                    .catchOnUi(e -> {
+                        //Log.e(TAG, "query local keys failed ", e);
+                        // Handle error
+                        return null;
+                    })
+                    // make sure, we don't miss any exceptions.
+                    .conclude();
         }
-
-        // query for this user's keys asynchronously
-        _keyManager.queryLocalKeysAsync(firstUser, forceUpdate, CancellationTokens.None)
-                // when completed with success, continue on the UI thread
-                .continueOnUi((Func1<List<CachedKeyInformation>, Void, Exception>) cachedKeyInformations -> {
-                    _keys.clear();
-                    _keys.addAll(cachedKeyInformations);
-
-                    return null;
-                })
-                // handle async exceptions
-                .catchOnUi(e -> {
-                    //Log.e(TAG, "query local keys failed ", e);
-                    // Handle error
-                    return null;
-                })
-                // make sure, we don't miss any exceptions.
-                .conclude();
     }
 
-    private void authenticate() {
-        User user = _userManager.getFirstUser();
-        if(null != user){
-            _userManager.logOff(user, CancellationTokens.None);
+    private boolean isUserLoggedIn() {
+        boolean isLoggedIn = false;
+
+        if(null != _userManager){
+            List<String> userIds = _userManager.getUsers();
+            if(1 == userIds.size()) {
+                isLoggedIn = true;
+            }
         }
 
-        Configuration witteConfiguration = App.WitteConfiguration;
-        AuthenticateAsyncTask _authenticationTask = new AuthenticateAsyncTask(
-                getActivity(),
-                witteConfiguration,
-                _userManager,
-                _notificationManager);
+        return isLoggedIn;
+    }
 
-        _authenticationTask.execute(App.WitteUserId);
+    private void updateUI() {
+        if(isUserLoggedIn()) {
+            _btnLogout.setEnabled(true);
+            _btnLogin.setEnabled(false);
+            _btnTriggerLock.setEnabled(true);
+            _tvBoxId.setEnabled(true);
+        }
+        else {
+            _btnLogout.setEnabled(false);
+            _btnLogin.setEnabled(true);
+            _btnTriggerLock.setEnabled(false);
+            _tvBoxId.setEnabled(false);
+        }
+    }
+    private void login() {
+        if(!isUserLoggedIn()){
+
+            try {
+                _progressDialog = ProgressDialog.show(
+                        getContext(),
+                        "",
+                        "Logging in...",
+                        true);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            WitteTokenProvider witteTokenProvider = new WitteTokenProvider(
+                    this.getContext(),
+                    App.WitteConfiguration,
+                    App.WitteUserId);
+
+            witteTokenProvider.AccessToken()
+                    .continueOnUi(accessToken -> {
+                        if(null != accessToken && accessToken != "") {
+                            // login with access token
+                            _userManager.logInAsync(accessToken, CancellationTokens.None)
+                                    .continueOnUi(userId -> {
+                                        // query keys
+                                        _notificationManager.pollForNotificationsAsync(CancellationTokens.None)
+                                                .catchOnUi(e -> {
+                                                    Log.e(TAG, "Failed to poll for notifications.", e);
+                                                    return null;
+                                                }).conclude();
+
+                                        updateUI();
+
+                                        return null;
+                                    })
+                                    .catchOnUi(e -> {
+                                        e.printStackTrace();
+                                        return null;
+                                    })
+                                    .finallyOnUi(() -> {
+                                        if(null != _progressDialog){
+                                            _progressDialog.dismiss();
+                                        }
+                                        _progressDialog = null;
+                                    });
+                        }
+                       return null;
+                    })
+                    .catchOnUi(e -> {
+                        e.printStackTrace();
+                        return null;
+                    })
+                    .finallyOnUi(() -> {
+                        if(null != _progressDialog){
+                            _progressDialog.dismiss();
+                        }
+                        _progressDialog = null;
+                    });
+        }
+    }
+
+    private void logout(){
+        if(isUserLoggedIn()){
+            String userId = _userManager.getUsers().get(0);
+            _userManager.logOutAsync(userId, CancellationTokens.None)
+                    .finallyOnUi(() -> {
+                        updateUI();
+                    });
+        }
     }
 
     private void triggerLock() {
@@ -208,7 +293,7 @@ public class MainFragment extends Fragment {
         String physicalLockId;
         try{
              physicalLockId = BoxIdConverter.toPhysicalLockId(boxId);
-            if (!_bleLockManager.isLockNearby(physicalLockId)) {
+            if (!_bleLockScanner.isLockNearby(physicalLockId)) {
                 Toast.makeText(getContext(), "The box is not in reach.", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -218,12 +303,12 @@ public class MainFragment extends Fragment {
             return;
         }
 
-        _bleLockManager
-                .executeCommandAsync(
-                        new String[0],
-                        physicalLockId,
-                        tlcpConnection -> _commandExecutionFacade.triggerLockAsync(tlcpConnection, CancellationTokens.None),
-                        CancellationTokens.None)
+        // 60s timeout
+        final int timeoutInMs = 60 * 1000;
+        CancellationToken timeout = CancellationTokens.fromTimeout(timeoutInMs);
+
+        String bluetoothAddress = _bleLockScanner.getLock(physicalLockId).getBluetoothAddress();
+        _bleBleLockCommunicator.executeCommandAsync(bluetoothAddress, physicalLockId, tlcpConnection -> _commandExecutionFacade.triggerLockAsync(tlcpConnection, timeout), timeout)
                 .continueOnUi(commandResult -> {
                     if (commandResult.getCommandResultCode() == CommandResult.CommandResultCode.Ok) {
                         Toast.makeText(getContext(), "triggerLock successful", Toast.LENGTH_SHORT).show();
@@ -261,105 +346,9 @@ public class MainFragment extends Fragment {
                         return false;
                     }
                 })
-                .catchOnUi(exception -> {
+                .catchOnUi(e -> {
                     Toast.makeText(getContext(), "triggerLock exception", Toast.LENGTH_SHORT).show();
                     return false;
                 });
-    }
-
-    @SuppressLint("StaticFieldLeak")
-    public class AuthenticateAsyncTask extends AsyncTask<Integer, Void, String> {
-        private final String TAG = AuthenticateAsyncTask.class.getCanonicalName();
-        private Context _context;
-        private Configuration _witteConfiguration;
-        private UserManager _userManager;
-        private ProgressDialog _progressDialog;
-
-        AuthenticateAsyncTask(
-                Context context,
-                Configuration configuration,
-                UserManager userManager,
-                NotificationManager notificationManager) {
-
-            _context = context;
-            _witteConfiguration = configuration;
-            _userManager = userManager;
-            _notificationManager = notificationManager;
-        }
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-
-            try {
-                _progressDialog = ProgressDialog.show(
-                        _context,
-                        "",
-                        "Authenticating...",
-                        true);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        protected String doInBackground(Integer... integers) {
-            String idToken = null;
-
-            try {
-                int witteUserId = integers[0];
-                IdTokenRequest request = new IdTokenRequest();
-                idToken = request.execute(_witteConfiguration, witteUserId);
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            return idToken;
-        }
-
-        @Override
-        protected void onPostExecute(String idToken) {
-            if (null != idToken && !"".equals(idToken)) {
-                Identity identity = new Identity(Configuration.IpId, idToken);
-                _userManager.authenticateAsync(identity, CancellationTokens.None)
-                        .continueOnUi(user -> {
-
-                             // successfully authenticated user with Tapkey backend
-                             // actively poll for notifications, so we don't have to wait for push
-                             // notifications being delivered.
-                            _notificationManager.pollForNotificationsAsync()
-                                    .catchOnUi(e -> {
-                                        Log.e(TAG, "Failed to poll for notifications.", e);
-                                        return null;
-                                    }).conclude();
-
-                            _bleLockManager.startForegroundScan();
-                            _tvBoxId.setEnabled(true);
-                            _btnTriggerLock.setEnabled(true);
-
-                            return null;
-                        })
-                        .catchOnUi(e -> {
-                            // authentication failed
-                            return null;
-                        })
-                        .finallyOnUi(() -> {
-                            _progressDialog.dismiss();
-                        })
-                        .conclude();
-            }
-            else {
-                Log.e(TAG, "Failed to retrieve wma token from WITTE backend");
-                if (null != _progressDialog) {
-                    _progressDialog.dismiss();
-                    _progressDialog = null;
-                }
-            }
-        }
     }
 }
