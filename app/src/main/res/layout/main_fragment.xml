@@ -104,6 +104,25 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Trigger Lock" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:textStyle="bold"
+                android:text="Keys:"/>
+
+            <TextView
+                android:id="@+id/main_frag_tv_local_keys"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"/>
+
+            <Button
+                android:id="@+id/main_frag_btn_query_local_keys"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Query Local Keys" />
         </LinearLayout>
     </ScrollView>
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -32,8 +32,14 @@ import com.tapkey.mobile.model.KeyDetails;
 import com.tapkey.mobile.utils.Func1;
 import com.tapkey.mobile.utils.ObserverRegistration;
 
+import net.tpky.mc.model.Grant;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
 import digital.witte.wittemobilelibrary.Configuration;
 import digital.witte.wittemobilelibrary.box.BoxFeedback;
@@ -50,10 +56,12 @@ public class MainFragment extends Fragment {
     private TextView _tvSubscriptionKey;
     private TextView _tvSdkKey;
     private TextView _tvUserId;
+    private TextView _tvLocalKeys;
     private EditText _tvBoxId;
     private Button _btnTriggerLock;
     private Button _btnLogin;
     private Button _btnLogout;
+    private Button _btnQueryLocalKeys;
 
     private BleLockCommunicator _bleBleLockCommunicator;
     private BleLockScanner _bleLockScanner;
@@ -78,6 +86,7 @@ public class MainFragment extends Fragment {
         _tvSubscriptionKey = view.findViewById(R.id.main_frag_tv_subscription_key);
         _tvSdkKey = view.findViewById(R.id.main_frag_tv_sdk_key);
         _tvUserId = view.findViewById(R.id.main_frag_tv_user_id);
+        _tvLocalKeys = view.findViewById(R.id.main_frag_tv_local_keys);
 
         _btnLogin = view.findViewById(R.id.main_frag_btn_authenticate);
         _btnLogin.setOnClickListener(button -> login());
@@ -90,6 +99,9 @@ public class MainFragment extends Fragment {
 
         _btnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
         _btnTriggerLock.setOnClickListener(button -> triggerLock());
+
+        _btnQueryLocalKeys = view.findViewById(R.id.main_frag_btn_query_local_keys);
+        _btnQueryLocalKeys.setOnClickListener(button -> queryLocalKeys());
 
         return view;
     }
@@ -122,13 +134,11 @@ public class MainFragment extends Fragment {
         if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
                 // TODO: show permission rationale
-            }
-            else {
+            } else {
                 requestPermissions(new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSIONS_REQUEST__ACCESS_COARSE_LOCATION);
             }
-        }
-        else {
-            if(null == _foregroundScanRegistration){
+        } else {
+            if (null == _foregroundScanRegistration) {
                 _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
             }
         }
@@ -150,7 +160,7 @@ public class MainFragment extends Fragment {
     public void onPause() {
         super.onPause();
 
-        if(null != _foregroundScanRegistration){
+        if (null != _foregroundScanRegistration) {
             _foregroundScanRegistration.close();
             _foregroundScanRegistration = null;
         }
@@ -161,22 +171,46 @@ public class MainFragment extends Fragment {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
-    private void onKeyUpdate() {
-        if(isUserLoggedIn()){
-            // query for this user's keys asynchronously
+    private void queryLocalKeys() {
+        if (isUserLoggedIn()) {
+            // query for this user's keys
             String userId = _userManager.getUsers().get(0);
             _keyManager.queryLocalKeysAsync(userId, CancellationTokens.None)
-                    // when completed with success, continue on the UI thread
-                    .continueOnUi((Func1<List<KeyDetails>, Void, Exception>) cachedKeyInformations -> {
+                    .continueOnUi((Func1<List<KeyDetails>, Void, Exception>) keyDetails -> {
                         _keys.clear();
-                        _keys.addAll(cachedKeyInformations);
+                        _keys.addAll(keyDetails);
+
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US);
+                        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                        StringBuilder sb = new StringBuilder();
+
+                        for (KeyDetails key : keyDetails) {
+                            Grant grant = key.getGrant();
+                            if (null != grant) {
+                                String physicalLockId = grant.getBoundLock().getPhysicalLockId();
+                                String boxId = BoxIdConverter.toBoxId(physicalLockId);
+                                Date grantValidFrom = grant.getValidFrom();
+                                Date grantValidBefore = grant.getValidBefore();
+                                Date keyValidBefore = key.getValidBefore();
+
+                                sb.append(String.format("• %s%s", boxId, System.lineSeparator()));
+                                sb.append(String.format("\tgrant starts: %s%s", sdf.format(grantValidFrom), System.lineSeparator()));
+                                if (null != grantValidBefore) {
+                                    sb.append(String.format("\tgrant ends: %s%s", sdf.format(keyValidBefore), System.lineSeparator()));
+                                } else {
+                                    sb.append(String.format("\tgrant ends: unlimited%s", System.lineSeparator()));
+                                }
+
+                                sb.append(String.format("\tvalid before: %s%s", sdf.format(keyValidBefore), System.lineSeparator()));
+                            }
+                        }
+
+                        _tvLocalKeys.setText(sb.toString());
 
                         return null;
                     })
-                    // handle async exceptions
                     .catchOnUi(e -> {
-                        //Log.e(TAG, "query local keys failed ", e);
-                        // Handle error
+                        Log.e(TAG, "queryLocalKeys failed ", e);
                         return null;
                     })
                     // make sure, we don't miss any exceptions.
@@ -184,12 +218,16 @@ public class MainFragment extends Fragment {
         }
     }
 
+    private void onKeyUpdate() {
+        queryLocalKeys();
+    }
+
     private boolean isUserLoggedIn() {
         boolean isLoggedIn = false;
 
-        if(null != _userManager){
+        if (null != _userManager) {
             List<String> userIds = _userManager.getUsers();
-            if(1 == userIds.size()) {
+            if (1 == userIds.size()) {
                 isLoggedIn = true;
             }
         }
@@ -198,21 +236,24 @@ public class MainFragment extends Fragment {
     }
 
     private void updateUI() {
-        if(isUserLoggedIn()) {
+        if (isUserLoggedIn()) {
             _btnLogout.setEnabled(true);
             _btnLogin.setEnabled(false);
             _btnTriggerLock.setEnabled(true);
+            _btnQueryLocalKeys.setEnabled(true);
             _tvBoxId.setEnabled(true);
-        }
-        else {
+        } else {
             _btnLogout.setEnabled(false);
             _btnLogin.setEnabled(true);
             _btnTriggerLock.setEnabled(false);
+            _btnQueryLocalKeys.setEnabled(false);
             _tvBoxId.setEnabled(false);
+            _tvLocalKeys.setText("");
         }
     }
+
     private void login() {
-        if(!isUserLoggedIn()){
+        if (!isUserLoggedIn()) {
 
             try {
                 _progressDialog = ProgressDialog.show(
@@ -220,8 +261,7 @@ public class MainFragment extends Fragment {
                         "",
                         "Logging in...",
                         true);
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
 
@@ -232,7 +272,7 @@ public class MainFragment extends Fragment {
 
             witteTokenProvider.AccessToken()
                     .continueOnUi(accessToken -> {
-                        if(null != accessToken && accessToken != "") {
+                        if (null != accessToken && accessToken != "") {
                             // login with access token
                             _userManager.logInAsync(accessToken, CancellationTokens.None)
                                     .continueOnUi(userId -> {
@@ -252,20 +292,20 @@ public class MainFragment extends Fragment {
                                         return null;
                                     })
                                     .finallyOnUi(() -> {
-                                        if(null != _progressDialog){
+                                        if (null != _progressDialog) {
                                             _progressDialog.dismiss();
                                         }
                                         _progressDialog = null;
                                     });
                         }
-                       return null;
+                        return null;
                     })
                     .catchOnUi(e -> {
                         e.printStackTrace();
                         return null;
                     })
                     .finallyOnUi(() -> {
-                        if(null != _progressDialog){
+                        if (null != _progressDialog) {
                             _progressDialog.dismiss();
                         }
                         _progressDialog = null;
@@ -273,8 +313,8 @@ public class MainFragment extends Fragment {
         }
     }
 
-    private void logout(){
-        if(isUserLoggedIn()){
+    private void logout() {
+        if (isUserLoggedIn()) {
             String userId = _userManager.getUsers().get(0);
             _userManager.logOutAsync(userId, CancellationTokens.None)
                     .finallyOnUi(() -> {
@@ -291,14 +331,13 @@ public class MainFragment extends Fragment {
         }
 
         String physicalLockId;
-        try{
-             physicalLockId = BoxIdConverter.toPhysicalLockId(boxId);
+        try {
+            physicalLockId = BoxIdConverter.toPhysicalLockId(boxId);
             if (!_bleLockScanner.isLockNearby(physicalLockId)) {
                 Toast.makeText(getContext(), "The box is not in reach.", Toast.LENGTH_SHORT).show();
                 return;
             }
-        }
-        catch (Exception exception){
+        } catch (Exception exception) {
             Toast.makeText(getContext(), exception.getMessage(), Toast.LENGTH_SHORT).show();
             return;
         }
@@ -324,24 +363,20 @@ public class MainFragment extends Fragment {
                                 if (BoxState.UNLOCKED == boxState) {
 
                                     Log.d(TAG, "Box has been opened");
-                                }
-                                else if (BoxState.LOCKED == boxState) {
+                                } else if (BoxState.LOCKED == boxState) {
 
                                     Log.d(TAG, "Box has been closed");
-                                }
-                                else if (BoxState.DRAWER_OPEN == boxState) {
+                                } else if (BoxState.DRAWER_OPEN == boxState) {
 
                                     Log.d(TAG, "The drawer of the Box is open.");
                                 }
-                            }
-                            catch (IllegalArgumentException iaEx) {
+                            } catch (IllegalArgumentException iaEx) {
 
                                 Log.e(TAG, iaEx.getMessage());
                             }
                         }
                         return true;
-                    }
-                    else {
+                    } else {
                         Toast.makeText(getContext(), "triggerLock error", Toast.LENGTH_SHORT).show();
                         return false;
                     }
