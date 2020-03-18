@@ -54,13 +54,14 @@ public class WitteTokenProvider {
         PromiseSource<String> promiseSource = new PromiseSource<>();
 
         Async.executeAsync(() -> {
-            // retrieve WITTE idToken
+            // Retrieve the WITTE idToken.
+            // Note: The WITTE backend should not be called from within the mobile
+            // application in production environments.
             IdTokenRequest request = new IdTokenRequest();
             String idToken = request.execute(_witteConfiguration, _witteUserId);
             return idToken;
-
         }).continueOnUi(idToken -> {
-            // retrieve Tapkey access token
+            // Retrieve the Tapkey access token via token exchange.
             Uri.Builder builder = new Uri.Builder();
             Uri authorizationServer = builder
                     .scheme(AuthConfigScheme)

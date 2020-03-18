@@ -13,11 +13,14 @@ public class WitteTokenRefreshHandler implements TokenRefreshHandler {
     }
 
     @Override
-    public Promise<String> refreshAuthenticationAsync(String s, CancellationToken cancellationToken) {
+    public Promise<String> refreshAuthenticationAsync(String tapkeyUserId, CancellationToken cancellationToken) {
         return _witteTokenProvider.AccessToken();
     }
 
     @Override
-    public void onRefreshFailed(String s) {
+    public void onRefreshFailed(String tapkeyUserId) {
+        // At this point you should logout the user from the app as the token refresh is permanently
+        // broken and the TapkeyMobileLib is no longer able to communicate with the Tapkey backend.
+        // https://developers.tapkey.io/mobile/android/reference/Tapkey.MobileLib/latest/com/tapkey/mobile/auth/TokenRefreshHandler.html#onRefreshFailed-java.lang.String-
     }
 }
