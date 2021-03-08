@@ -1,54 +1,31 @@
 package digital.witte.mobile.sample;
 
 import android.app.Application;
+import android.util.Log;
 
 import com.tapkey.mobile.TapkeyAppContext;
 import com.tapkey.mobile.TapkeyEnvironmentConfig;
 import com.tapkey.mobile.TapkeyEnvironmentConfigBuilder;
 import com.tapkey.mobile.TapkeyServiceFactory;
 import com.tapkey.mobile.TapkeyServiceFactoryBuilder;
+import com.tapkey.mobile.auth.TokenRefreshHandler;
 import com.tapkey.mobile.broadcast.PollingScheduler;
+import com.tapkey.mobile.concurrent.CancellationToken;
+import com.tapkey.mobile.concurrent.Promise;
 
+import digital.witte.mobile.sample.backend.DemoBackendAccessor;
 import digital.witte.wittemobilelibrary.Configuration;
 
 public class App extends Application implements TapkeyAppContext {
-
     /**
-     * The TapkeyServiceFactory holds all needed services
+     * The TapkeyServiceFactory holds all needed services of the Tapkey Mobile Library
      */
     private TapkeyServiceFactory _tapkeyServiceFactory;
 
     /**
-     * Your WITTE Customer Id.
-     * TODO: Add your WITTE Customer Id here.
+     * The access token provider for login to the Tapkey Mobile SDK and token refresh
      */
-    private final static int CustomerId = -1;
-
-    /**
-     * Your WITTE SDK Key.
-     * TODO: Add your WITTE SDK Key here.
-     */
-    private final static String SdkKey = "Todo: Add your WITTE sdk key here";
-
-    /**
-     * Your WITTE Subscription Key.
-     * TODO: Add your WITTE Subscription Key here.
-     */
-    private final static String SubscriptionKey = "Todo: Add your WITTE subscription key here";
-
-    /**
-     * Customer specific configuration
-     */
-    final static Configuration WitteConfiguration = new Configuration(
-            CustomerId,
-            SdkKey,
-            SubscriptionKey);
-
-    /**
-     * User Id of one specific WITTE user (this needs to be retrieved at runtime in production apps)
-     * TODO: Add your WITTE User Id here.
-     */
-    public final static int WitteUserId = -1;
+    private TokenProvider _tokenProvider;
 
     @Override
     public void onCreate() {
@@ -59,19 +36,26 @@ public class App extends Application implements TapkeyAppContext {
                 .setTenantId(Configuration.TenantId)
                 .build();
 
+        _tokenProvider = new TokenProvider(this, new DemoBackendAccessor());
+
         _tapkeyServiceFactory = new TapkeyServiceFactoryBuilder(this)
                 .setConfig(tapkeyEnvironmentConfig)
-                .setTokenRefreshHandler(new WitteTokenRefreshHandler(new WitteTokenProvider(this, WitteConfiguration, WitteUserId)))
+                .setTokenRefreshHandler(new TokenRefreshHandler() {
+                    @Override
+                    public Promise<String> refreshAuthenticationAsync(String s, CancellationToken cancellationToken) {
+                        return _tokenProvider.AccessToken();
+                    }
+
+                    @Override
+                    public void onRefreshFailed(String tapkeyUserId) {
+                        //"https://developers.tapkey.io/mobile/android/reference/Tapkey.MobileLib/latest/com/tapkey/mobile/auth/TokenRefreshHandler.html#onRefreshFailed-java.lang.String-"
+                        Log.e("", "Reauthentication of an access token has failed in a non-recoverable way.");
+                    }
+                })
                 .build();
 
-        /*
-         * Register PushNotificationReceiver
-         *
-         * The PushNotificationReceiver polls for notifications from the Tapkey backend.
-         * The JobId must a unique id across the whole app
-         * The default interval is 8 hours and can be changed fitting requirements of the provided service
-         *
-         */
+        // The polling scheduler will take care of regular synchronization and refresh of digital keys
+        // https://developers.tapkey.io/mobile/android/getting_started/#polling-for-data
         int uniqueJobId = 321;
         PollingScheduler.register(this, uniqueJobId, PollingScheduler.DEFAULT_INTERVAL);
     }
@@ -79,5 +63,9 @@ public class App extends Application implements TapkeyAppContext {
     @Override
     public TapkeyServiceFactory getTapkeyServiceFactory() {
         return _tapkeyServiceFactory;
+    }
+
+    public TokenProvider getTokenProvider() {
+        return _tokenProvider;
     }
 }

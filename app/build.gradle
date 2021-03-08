@@ -14,36 +14,58 @@ repositories {
     }
 }
 
-def getWitteCustomerId() {
+def getFlinkeyCustomerId() {
     Properties properties = new Properties()
     properties.load(project.rootProject.file('local.properties').newDataInputStream())
-    return properties.getProperty("WITTE_CUSTOMER_ID")
+    return properties.getProperty("FLINKEY_CUSTOMER_ID")
 }
 
-def getWitteSdkKey() {
+def getFlinkeySdkKey() {
     Properties properties = new Properties()
     properties.load(project.rootProject.file('local.properties').newDataInputStream())
-    return properties.getProperty("WITTE_SDK_KEY")
+    return properties.getProperty("FLINKEY_SDK_KEY")
 }
 
-def getWitteSubscriptionKey() {
+def getFlinkeyApiKey() {
     Properties properties = new Properties()
     properties.load(project.rootProject.file('local.properties').newDataInputStream())
-    return properties.getProperty("WITTE_SUBSCRIPTION_KEY")
+    return properties.getProperty("FLINKEY_API_KEY")
 }
+
+def getFlinkeyUserId() {
+    Properties properties = new Properties()
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+    return properties.getProperty("FLINKEY_USER_ID")
+}
+
+def getFlinkeyApiManagerUsername() {
+    Properties properties = new Properties()
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+    return properties.getProperty("FLINKEY_API_MANAGER_USERNAME")
+}
+
+def getFlinkeyApiManagerPassword() {
+    Properties properties = new Properties()
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+    return properties.getProperty("FLINKEY_API_MANAGER_PASSWORD")
+}
+
 android {
-    compileSdkVersion 28
+    compileSdkVersion 30
 
     defaultConfig {
         applicationId "digital.witte.wittemobilelibrary.sample"
         minSdkVersion 21
-        targetSdkVersion 28
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField "String", "WITTE_CUSTOMER_ID", "\"" + getWitteCustomerId() + "\""
-        buildConfigField "String", "WITTE_SDK_KEY", "\"" + getWitteSdkKey() + "\""
-        buildConfigField "String", "WITTE_SUBSCRIPTION_KEY", "\"" + getWitteSubscriptionKey() + "\""
+        buildConfigField "String", "FLINKEY_CUSTOMER_ID", "\"" + getFlinkeyCustomerId() + "\""
+        buildConfigField "String", "FLINKEY_SDK_KEY", "\"" + getFlinkeySdkKey() + "\""
+        buildConfigField "String", "FLINKEY_API_KEY", "\"" + getFlinkeyApiKey() + "\""
+        buildConfigField "String", "FLINKEY_USER_ID", "\"" + getFlinkeyUserId() + "\""
+        buildConfigField "String", "FLINKEY_API_MANAGER_USERNAME", "\"" + getFlinkeyApiManagerUsername() + "\""
+        buildConfigField "String", "FLINKEY_API_MANAGER_PASSWORD", "\"" + getFlinkeyApiManagerPassword() + "\""
         manifestPlaceholders = [auth0Domain: "", auth0Scheme: "https", 'appAuthRedirectScheme': 'digital.witte.mobile.sample.appauth']
     }
 
@@ -70,8 +92,8 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     // Standard dependencies
-    implementation 'androidx.appcompat:appcompat:1.1.0'
-    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'android.arch.navigation:navigation-fragment:1.0.0'
@@ -80,13 +102,13 @@ dependencies {
     implementation 'digital.witte:witte-mobile-library:1.0.0'
 
     // Tapkey SDK
-    api 'com.tapkey.android:Tapkey.MobileLib:2.7.2.0'
+    api 'com.tapkey.android:Tapkey.MobileLib:2.12.7.0'
 
     // Token exchange
     implementation 'net.openid:appauth:0.7.1'
 
     // Test related dependencies
     testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'androidx.test:runner:1.3.0-rc01'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0-rc01'
+    androidTestImplementation 'androidx.test:runner:1.4.0-alpha04'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0-alpha04'
 }

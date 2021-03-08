@@ -1,5 +1,6 @@
 package digital.witte.mobile.sample;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
 import android.content.pm.PackageManager;
@@ -41,7 +42,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
-import digital.witte.wittemobilelibrary.Configuration;
+import digital.witte.mobile.sample.backend.DemoBackendAccessor;
 import digital.witte.wittemobilelibrary.box.BoxFeedback;
 import digital.witte.wittemobilelibrary.box.BoxIdConverter;
 import digital.witte.wittemobilelibrary.box.BoxState;
@@ -50,10 +51,10 @@ public class MainFragment extends Fragment {
 
     private static final String TAG = MainFragment.class.getCanonicalName();
 
-    private static final int PERMISSIONS_REQUEST__ACCESS_COARSE_LOCATION = 0;
-
+    private static final int PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION = 0;
+    private final ArrayList<KeyDetails> _keys = new ArrayList<>();
     private TextView _tvCustomerId;
-    private TextView _tvSubscriptionKey;
+    private TextView _tvApiKey;
     private TextView _tvSdkKey;
     private TextView _tvUserId;
     private TextView _tvLocalKeys;
@@ -62,7 +63,7 @@ public class MainFragment extends Fragment {
     private Button _btnLogin;
     private Button _btnLogout;
     private Button _btnQueryLocalKeys;
-
+    private TokenProvider _tokenProvider;
     private BleLockCommunicator _bleBleLockCommunicator;
     private BleLockScanner _bleLockScanner;
     private KeyManager _keyManager;
@@ -71,19 +72,15 @@ public class MainFragment extends Fragment {
     private NotificationManager _notificationManager;
     private ObserverRegistration _keyUpdateObserverRegistration;
     private ObserverRegistration _foregroundScanRegistration;
-    private ArrayList<KeyDetails> _keys = new ArrayList<>();
     private ProgressDialog _progressDialog;
 
     @Nullable
     @Override
-    public View onCreateView(
-            @NonNull LayoutInflater inflater,
-            @Nullable ViewGroup container,
-            @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.main_fragment, container, false);
         _tvCustomerId = view.findViewById(R.id.main_frag_tv_customer_id);
-        _tvSubscriptionKey = view.findViewById(R.id.main_frag_tv_subscription_key);
+        _tvApiKey = view.findViewById(R.id.main_frag_tv_subscription_key);
         _tvSdkKey = view.findViewById(R.id.main_frag_tv_sdk_key);
         _tvUserId = view.findViewById(R.id.main_frag_tv_user_id);
         _tvLocalKeys = view.findViewById(R.id.main_frag_tv_local_keys);
@@ -95,7 +92,8 @@ public class MainFragment extends Fragment {
         _btnLogout.setOnClickListener(button -> logout());
 
         _tvBoxId = view.findViewById(R.id.main_frag_et_box_id);
-        _tvBoxId.setHint("e.g. C1-1F-8E-7C");
+        //_tvBoxId.setHint("e.g. C1-1F-8E-7C");
+        _tvBoxId.setText("C1-1F-8E-7C");
 
         _btnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
         _btnTriggerLock.setOnClickListener(button -> triggerLock());
@@ -111,47 +109,46 @@ public class MainFragment extends Fragment {
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        TapkeyServiceFactory serviceFactory = ((App) getActivity().getApplication()).getTapkeyServiceFactory();
-        _bleLockScanner = serviceFactory.getBleLockScanner();
-        _bleBleLockCommunicator = serviceFactory.getBleLockCommunicator();
-        _keyManager = serviceFactory.getKeyManager();
-        _commandExecutionFacade = serviceFactory.getCommandExecutionFacade();
-        _userManager = serviceFactory.getUserManager();
-        _notificationManager = serviceFactory.getNotificationManager();
+        App app = ((App) getActivity().getApplication());
+        if (null != app) {
+            _tokenProvider = app.getTokenProvider();
+            TapkeyServiceFactory serviceFactory = app.getTapkeyServiceFactory();
+            _bleLockScanner = serviceFactory.getBleLockScanner();
+            _bleBleLockCommunicator = serviceFactory.getBleLockCommunicator();
+            _keyManager = serviceFactory.getKeyManager();
+            _commandExecutionFacade = serviceFactory.getCommandExecutionFacade();
+            _userManager = serviceFactory.getUserManager();
+            _notificationManager = serviceFactory.getNotificationManager();
 
-        Configuration witteConfiguration = App.WitteConfiguration;
-        _tvCustomerId.setText(String.format("%d", witteConfiguration.getWitteCustomerId()));
-        _tvSubscriptionKey.setText(witteConfiguration.getWitteSubscriptionKey());
-        _tvSdkKey.setText(witteConfiguration.getWitteSdkKey());
-        _tvUserId.setText(String.format("%d", App.WitteUserId));
+            _tvCustomerId.setText(String.format("%d", DemoBackendAccessor.FlinkeyUserId));
+            _tvApiKey.setText(DemoBackendAccessor.FlinkeyApiKey);
+            _tvSdkKey.setText(DemoBackendAccessor.FlinkeySdkKey);
+            _tvUserId.setText(String.format("%d", DemoBackendAccessor.FlinkeyUserId));
+        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
 
-        // check permissions
-        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
+        // check required permission
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
                 // TODO: show permission rationale
-            } else {
-                requestPermissions(new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSIONS_REQUEST__ACCESS_COARSE_LOCATION);
             }
-        } else {
-            if (null == _foregroundScanRegistration) {
-                _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
+            else {
+                requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION);
             }
         }
-
-        // Listen for changes in the available keys. Changes might happen, e.g. due to push
-        // notifications received from the Tapkey backend.
-        if (_keyUpdateObserverRegistration == null) {
-            _keyUpdateObserverRegistration = _keyManager
-                    .getKeyUpdateObservable()
-                    .addObserver(aVoid -> onKeyUpdate());
+        else if (null == _foregroundScanRegistration) {
+            // Start scanning for flinkey boxes
+            _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
         }
 
-        onKeyUpdate();
+        if (null == _keyUpdateObserverRegistration) {
+            // Register for digital key updates
+            _keyUpdateObserverRegistration = _keyManager.getKeyUpdateObservable().addObserver(aVoid -> queryLocalKeys());
+        }
 
         updateUI();
     }
@@ -161,6 +158,7 @@ public class MainFragment extends Fragment {
         super.onPause();
 
         if (null != _foregroundScanRegistration) {
+            // Stop scanning for flinkey boxes
             _foregroundScanRegistration.close();
             _foregroundScanRegistration = null;
         }
@@ -171,6 +169,9 @@ public class MainFragment extends Fragment {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
+    /**
+     * Checks locally available digital keys.
+     */
     private void queryLocalKeys() {
         if (isUserLoggedIn()) {
             // query for this user's keys
@@ -197,7 +198,8 @@ public class MainFragment extends Fragment {
                                 sb.append(String.format("\tgrant starts: %s%s", sdf.format(grantValidFrom), System.lineSeparator()));
                                 if (null != grantValidBefore) {
                                     sb.append(String.format("\tgrant ends: %s%s", sdf.format(keyValidBefore), System.lineSeparator()));
-                                } else {
+                                }
+                                else {
                                     sb.append(String.format("\tgrant ends: unlimited%s", System.lineSeparator()));
                                 }
 
@@ -218,10 +220,11 @@ public class MainFragment extends Fragment {
         }
     }
 
-    private void onKeyUpdate() {
-        queryLocalKeys();
-    }
-
+    /**
+     * Checks if a user is logged in to the Tapkey Mobile Library.
+     *
+     * @return true is a user is logged in
+     */
     private boolean isUserLoggedIn() {
         boolean isLoggedIn = false;
 
@@ -235,6 +238,9 @@ public class MainFragment extends Fragment {
         return isLoggedIn;
     }
 
+    /**
+     * Updates UI controls according to the state of the users login.
+     */
     private void updateUI() {
         if (isUserLoggedIn()) {
             _btnLogout.setEnabled(true);
@@ -242,7 +248,8 @@ public class MainFragment extends Fragment {
             _btnTriggerLock.setEnabled(true);
             _btnQueryLocalKeys.setEnabled(true);
             _tvBoxId.setEnabled(true);
-        } else {
+        }
+        else {
             _btnLogout.setEnabled(false);
             _btnLogin.setEnabled(true);
             _btnTriggerLock.setEnabled(false);
@@ -252,77 +259,66 @@ public class MainFragment extends Fragment {
         }
     }
 
+    /**
+     * Authenticates a user with the Tapkey Mobile Library.
+     */
     private void login() {
-        if (!isUserLoggedIn()) {
-
-            try {
-                _progressDialog = ProgressDialog.show(
-                        getContext(),
-                        "",
-                        "Logging in...",
-                        true);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            WitteTokenProvider witteTokenProvider = new WitteTokenProvider(
-                    this.getContext(),
-                    App.WitteConfiguration,
-                    App.WitteUserId);
-
-            witteTokenProvider.AccessToken()
-                    .continueOnUi(accessToken -> {
-                        if (null != accessToken && accessToken != "") {
-                            // login with access token
-                            _userManager.logInAsync(accessToken, CancellationTokens.None)
-                                    .continueOnUi(userId -> {
-                                        // query keys
-                                        _notificationManager.pollForNotificationsAsync(CancellationTokens.None)
-                                                .catchOnUi(e -> {
-                                                    Log.e(TAG, "Failed to poll for notifications.", e);
-                                                    return null;
-                                                }).conclude();
-
-                                        updateUI();
-
-                                        return null;
-                                    })
-                                    .catchOnUi(e -> {
-                                        e.printStackTrace();
-                                        return null;
-                                    })
-                                    .finallyOnUi(() -> {
-                                        if (null != _progressDialog) {
-                                            _progressDialog.dismiss();
-                                        }
-                                        _progressDialog = null;
-                                    });
-                        }
-                        return null;
-                    })
-                    .catchOnUi(e -> {
-                        e.printStackTrace();
-                        return null;
-                    })
-                    .finallyOnUi(() -> {
-                        if (null != _progressDialog) {
-                            _progressDialog.dismiss();
-                        }
-                        _progressDialog = null;
-                    });
-        }
-    }
-
-    private void logout() {
         if (isUserLoggedIn()) {
-            String userId = _userManager.getUsers().get(0);
-            _userManager.logOutAsync(userId, CancellationTokens.None)
-                    .finallyOnUi(() -> {
-                        updateUI();
-                    });
+            return;
         }
+
+        _progressDialog = ProgressDialog.show(getContext(), "", "Log in...", true);
+
+        // retrieve an access token
+        _tokenProvider.AccessToken().continueOnUi(accessToken -> {
+            if (null != accessToken && !"".equals(accessToken)) {
+                // login with access token
+                _userManager.logInAsync(accessToken, CancellationTokens.None).continueOnUi(userId -> {
+                    // synchronize digital keys
+                    _notificationManager.pollForNotificationsAsync(CancellationTokens.None)
+                            .catchOnUi(e -> {
+                                Log.e(TAG, "Failed to poll for notifications.", e);
+                                return null;
+                            }).conclude();
+
+                    updateUI();
+                    return null;
+                }).catchOnUi(e -> {
+                    e.printStackTrace();
+                    return null;
+                }).finallyOnUi(() -> {
+                    if (null != _progressDialog) {
+                        _progressDialog.dismiss();
+                    }
+                    _progressDialog = null;
+                });
+            }
+            return null;
+        }).catchOnUi(e -> {
+            e.printStackTrace();
+            return null;
+        }).finallyOnUi(() -> {
+            if (null != _progressDialog) {
+                _progressDialog.dismiss();
+            }
+            _progressDialog = null;
+        });
     }
 
+    /**
+     * Logs the user out from the Tapkey Mobile Library
+     */
+    private void logout() {
+        if (!isUserLoggedIn()) {
+            return;
+        }
+        String userId = _userManager.getUsers().get(0);
+        _userManager.logOutAsync(userId, CancellationTokens.None).finallyOnUi(this::updateUI);
+    }
+
+    /**
+     * Opens of closes (triggers) a flinkey box.
+     */
     private void triggerLock() {
         String boxId = _tvBoxId.getText().toString();
         if ("".equals(boxId)) {
@@ -337,7 +333,8 @@ public class MainFragment extends Fragment {
                 Toast.makeText(getContext(), "The box is not in reach.", Toast.LENGTH_SHORT).show();
                 return;
             }
-        } catch (Exception exception) {
+        }
+        catch (Exception exception) {
             Toast.makeText(getContext(), exception.getMessage(), Toast.LENGTH_SHORT).show();
             return;
         }
@@ -368,43 +365,38 @@ public class MainFragment extends Fragment {
                                     BoxFeedback boxFeedback = BoxFeedback.create(responseData);
                                     int boxState = boxFeedback.getBoxState();
                                     if (BoxState.UNLOCKED == boxState) {
-
                                         Log.d(TAG, "Box has been opened");
-                                    } else if (BoxState.LOCKED == boxState) {
-
+                                    }
+                                    else if (BoxState.LOCKED == boxState) {
                                         Log.d(TAG, "Box has been closed");
-                                    } else if (BoxState.DRAWER_OPEN == boxState) {
-
+                                    }
+                                    else if (BoxState.DRAWER_OPEN == boxState) {
                                         Log.d(TAG, "The drawer of the Box is open.");
                                     }
-                                } catch (IllegalArgumentException iaEx) {
+                                }
+                                catch (IllegalArgumentException iaEx) {
                                     Log.e(TAG, iaEx.getMessage());
                                 }
                             }
                             break;
                         }
-                        case LockCommunicationError:
-                        {
+                        case LockCommunicationError: {
                             Log.e(TAG, "A transport-level error occurred when communicating with the locking device");
                             break;
                         }
-                        case LockDateTimeInvalid:
-                        {
+                        case LockDateTimeInvalid: {
                             Log.e(TAG, "Lock date/time are invalid.");
                             break;
                         }
-                        case ServerCommunicationError:
-                        {
+                        case ServerCommunicationError: {
                             Log.e(TAG, "An error occurred while trying to communicate with the Tapkey Trust Service (e.g. due to bad internet connection).");
                             break;
                         }
-                        case TechnicalError:
-                        {
+                        case TechnicalError: {
                             Log.e(TAG, "Some unspecific technical error has occurred.");
                             break;
                         }
-                        case Unauthorized:
-                        {
+                        case Unauthorized: {
                             Log.e(TAG, "Communication with the security backend succeeded but the user is not authorized for the given command on this locking device.");
                             break;
                         }
@@ -423,7 +415,7 @@ public class MainFragment extends Fragment {
                         }
                     }
 
-                    if(success) {
+                    if (success) {
                         Toast.makeText(getContext(), "triggerLock successful", Toast.LENGTH_SHORT).show();
                     }
                     else {
