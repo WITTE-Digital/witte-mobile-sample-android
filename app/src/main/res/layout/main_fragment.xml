@@ -34,8 +34,8 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textStyle="bold"
-                android:text="Your Subscription Key:"/>
+                android:text="Your API Key:"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/main_frag_tv_subscription_key"
