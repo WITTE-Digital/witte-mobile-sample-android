@@ -15,37 +15,37 @@ public class DemoBackendAccessor implements IBackendAccessor {
      * Your flinkey Customer-ID.
      * TODO: Add your flinkey Customer Id here.
      */
-    public final static int FlinkeyCustomerId = Integer.parseInt(BuildConfig.FLINKEY_CUSTOMER_ID);
+    public final static int FlinkeyCustomerId = -1;
 
     /**
      * Your SDK Key.
      * TODO: Add your SDK Key here.
      */
-    public final static String FlinkeySdkKey = BuildConfig.FLINKEY_SDK_KEY;
+    public final static String FlinkeySdkKey = "...";
 
     /**
      * Your flinkey-API-Key.
      * TODO: Add your flinkey-API-Key here.
      */
-    public final static String FlinkeyApiKey = BuildConfig.FLINKEY_API_KEY;
+    public final static String FlinkeyApiKey = "...";
 
     /**
      * User Id of one specific flinkey user (this needs to be retrieved at runtime in production apps)
      * TODO: Add your flinkey user Id here.
      */
-    public final static int FlinkeyUserId = Integer.parseInt(BuildConfig.FLINKEY_USER_ID);
+    public final static int FlinkeyUserId = -1;
 
     /**
      * Your flinkey API Manager Username
      * TODO: Add your flinkey API Manager Username here.
      */
-    private final static String FlinkeyApiManagerUsername = BuildConfig.FLINKEY_API_MANAGER_USERNAME;
+    private final static String FlinkeyApiManagerUsername = "...";
 
     /**
      * Your flinkey API Manager Password
      * TODO: Add your flinkey API Manager Password here.
      */
-    private final static String FlinkeyApiManagerPassword = BuildConfig.FLINKEY_API_MANAGER_PASSWORD;
+    private final static String FlinkeyApiManagerPassword = "...";
 
     /**
      * {@inheritDoc}
