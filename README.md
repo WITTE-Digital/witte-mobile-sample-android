@@ -1,6 +1,6 @@
 # witte-mobile-sample-android
 
-The WITTE mobile sample showcases the integration of the Tapkey Mobile SDK in an Android app. Its focus is on simplicity so it is easy to understand with the least dependencies possible. Therefore, it is not a reference implementation that adheres to architectural best practices.
+The WITTE mobile sample showcases the integration of the Tapkey Mobile SDK in an Android app. Its focus is on simplicity, so it is easy to understand with the least dependencies possible. Therefore, it is not a reference implementation that adheres to architectural best practices.
 
 Please visit the flinkey for Developers pages for a Getting Started guide and further information: 
 * https://developers.flinkey.de/mobile-sdk/getting-started/android/

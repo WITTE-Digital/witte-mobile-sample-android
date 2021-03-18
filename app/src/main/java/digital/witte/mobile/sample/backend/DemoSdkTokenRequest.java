@@ -18,6 +18,9 @@ import javax.net.ssl.HttpsURLConnection;
  * The corresponding functionality should be part of your backend implementation instead.
  */
 class DemoSdkTokenRequest {
+    private final String UrlUAT = "https://api-uat.flinkey.de/v3/sdk/token";
+    private final String UrlProd = "https://api.flinkey.de/v3/sdk/token";
+
     /**
      * Called to retrieve a flinkey idToken.
      *
@@ -41,7 +44,7 @@ class DemoSdkTokenRequest {
         byte[] postBodyBytes = postBody.getBytes(StandardCharsets.UTF_8);
 
         // create connection
-        URL url = new URL("https://api.flinkey.de/v3/sdk/token");
+        URL url = new URL(UrlUAT);
         HttpsURLConnection httpsURLConnection = (HttpsURLConnection) url.openConnection();
         httpsURLConnection.setRequestMethod("POST");
         httpsURLConnection.setRequestProperty("Content-Type", "application/json");
