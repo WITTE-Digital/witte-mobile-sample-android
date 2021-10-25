@@ -1,8 +1,9 @@
 package digital.witte.mobile.sample;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -14,10 +15,13 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.LifecycleObserver;
 
 import com.tapkey.mobile.TapkeyServiceFactory;
 import com.tapkey.mobile.ble.BleLockCommunicator;
@@ -30,10 +34,12 @@ import com.tapkey.mobile.manager.NotificationManager;
 import com.tapkey.mobile.manager.UserManager;
 import com.tapkey.mobile.model.CommandResult;
 import com.tapkey.mobile.model.KeyDetails;
+import com.tapkey.mobile.tlcp.commands.DefaultTriggerLockCommandBuilder;
 import com.tapkey.mobile.utils.Func1;
 import com.tapkey.mobile.utils.ObserverRegistration;
 
 import net.tpky.mc.model.Grant;
+import net.tpky.mc.tlcp.model.TriggerLockCommand;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -47,12 +53,19 @@ import digital.witte.wittemobilelibrary.box.BoxFeedback;
 import digital.witte.wittemobilelibrary.box.BoxIdConverter;
 import digital.witte.wittemobilelibrary.box.BoxState;
 
-public class MainFragment extends Fragment {
+public class MainFragment extends Fragment implements LifecycleObserver {
 
     private static final String TAG = MainFragment.class.getCanonicalName();
 
-    private static final int PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION = 0;
     private final ArrayList<KeyDetails> _keys = new ArrayList<>();
+    private final ActivityResultLauncher<String> _requestPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+        if (isGranted) {
+            Log.d(TAG, "Permission granted");
+        }
+        else {
+            Log.d(TAG, "Permission denied");
+        }
+    });
     private TextView _tvCustomerId;
     private TextView _tvApiKey;
     private TextView _tvSdkKey;
@@ -73,6 +86,26 @@ public class MainFragment extends Fragment {
     private ObserverRegistration _keyUpdateObserverRegistration;
     private ObserverRegistration _foregroundScanRegistration;
     private ProgressDialog _progressDialog;
+
+    @Override
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+
+        Activity activity = getActivity();
+        if (null != activity) {
+            App app = ((App) activity.getApplication());
+            if (null != app) {
+                _tokenProvider = app.getTokenProvider();
+                TapkeyServiceFactory serviceFactory = app.getTapkeyServiceFactory();
+                _bleLockScanner = serviceFactory.getBleLockScanner();
+                _bleBleLockCommunicator = serviceFactory.getBleLockCommunicator();
+                _keyManager = serviceFactory.getKeyManager();
+                _commandExecutionFacade = serviceFactory.getCommandExecutionFacade();
+                _userManager = serviceFactory.getUserManager();
+                _notificationManager = serviceFactory.getNotificationManager();
+            }
+        }
+    }
 
     @Nullable
     @Override
@@ -101,56 +134,42 @@ public class MainFragment extends Fragment {
         _btnQueryLocalKeys = view.findViewById(R.id.main_frag_btn_query_local_keys);
         _btnQueryLocalKeys.setOnClickListener(button -> queryLocalKeys());
 
+        _tvCustomerId.setText(String.format(Locale.US, "%d", DemoBackendAccessor.FlinkeyCustomerId));
+        _tvApiKey.setText(DemoBackendAccessor.FlinkeyApiKey);
+        _tvSdkKey.setText(DemoBackendAccessor.FlinkeySdkKey);
+        _tvUserId.setText(String.format(Locale.US, "%d", DemoBackendAccessor.FlinkeyUserId));
+
         return view;
     }
 
-    @SuppressLint("DefaultLocale")
-    @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
-
-        App app = ((App) getActivity().getApplication());
-        if (null != app) {
-            _tokenProvider = app.getTokenProvider();
-            TapkeyServiceFactory serviceFactory = app.getTapkeyServiceFactory();
-            _bleLockScanner = serviceFactory.getBleLockScanner();
-            _bleBleLockCommunicator = serviceFactory.getBleLockCommunicator();
-            _keyManager = serviceFactory.getKeyManager();
-            _commandExecutionFacade = serviceFactory.getCommandExecutionFacade();
-            _userManager = serviceFactory.getUserManager();
-            _notificationManager = serviceFactory.getNotificationManager();
-
-            _tvCustomerId.setText(String.format("%d", DemoBackendAccessor.FlinkeyUserId));
-            _tvApiKey.setText(DemoBackendAccessor.FlinkeyApiKey);
-            _tvSdkKey.setText(DemoBackendAccessor.FlinkeySdkKey);
-            _tvUserId.setText(String.format("%d", DemoBackendAccessor.FlinkeyUserId));
-        }
-    }
 
     @Override
     public void onResume() {
         super.onResume();
 
         // check required permission
-        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
+        Context context = getContext();
+        if (null != context) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                if (null == _foregroundScanRegistration) {
+                    // Start scanning for flinkey boxes
+                    _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
+                }
+
+                if (null == _keyUpdateObserverRegistration) {
+                    // Register for digital key updates
+                    _keyUpdateObserverRegistration = _keyManager.getKeyUpdateObservable().addObserver(aVoid -> queryLocalKeys());
+                }
+            }
+            else if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
                 // TODO: show permission rationale
             }
             else {
-                requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION);
+                _requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION);
             }
-        }
-        else if (null == _foregroundScanRegistration) {
-            // Start scanning for flinkey boxes
-            _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
-        }
 
-        if (null == _keyUpdateObserverRegistration) {
-            // Register for digital key updates
-            _keyUpdateObserverRegistration = _keyManager.getKeyUpdateObservable().addObserver(aVoid -> queryLocalKeys());
+            updateUI();
         }
-
-        updateUI();
     }
 
     @Override
@@ -162,11 +181,6 @@ public class MainFragment extends Fragment {
             _foregroundScanRegistration.close();
             _foregroundScanRegistration = null;
         }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     /**
@@ -344,7 +358,16 @@ public class MainFragment extends Fragment {
         CancellationToken timeout = CancellationTokens.fromTimeout(timeoutInMs);
 
         String bluetoothAddress = _bleLockScanner.getLock(physicalLockId).getBluetoothAddress();
-        _bleBleLockCommunicator.executeCommandAsync(bluetoothAddress, physicalLockId, tlcpConnection -> _commandExecutionFacade.triggerLockAsync(tlcpConnection, timeout), timeout)
+
+        _bleBleLockCommunicator.executeCommandAsync(
+                bluetoothAddress,
+                physicalLockId,
+                tlcpConnection ->
+                {
+                    TriggerLockCommand triggerLockCommand = new DefaultTriggerLockCommandBuilder().build();
+                    return _commandExecutionFacade.executeStandardCommandAsync(tlcpConnection, triggerLockCommand, timeout);
+                },
+                timeout)
                 .continueOnUi(commandResult -> {
                     boolean success = false;
 
