@@ -9,12 +9,15 @@ import com.tapkey.mobile.TapkeyEnvironmentConfigBuilder;
 import com.tapkey.mobile.TapkeyServiceFactory;
 import com.tapkey.mobile.TapkeyServiceFactoryBuilder;
 import com.tapkey.mobile.auth.TokenRefreshHandler;
+import com.tapkey.mobile.ble.TapkeyBleAdvertisingFormat;
+import com.tapkey.mobile.ble.TapkeyBleAdvertisingFormatBuilder;
 import com.tapkey.mobile.broadcast.PollingScheduler;
 import com.tapkey.mobile.concurrent.CancellationToken;
 import com.tapkey.mobile.concurrent.Promise;
 
 import digital.witte.mobile.sample.backend.DemoBackendAccessor;
 import digital.witte.wittemobilelibrary.Configuration;
+import digital.witte.wittemobilelibrary.box.BoxIdConverter;
 
 public class App extends Application implements TapkeyAppContext {
     /**
@@ -32,14 +35,19 @@ public class App extends Application implements TapkeyAppContext {
         super.onCreate();
 
         TapkeyEnvironmentConfig tapkeyEnvironmentConfig = new TapkeyEnvironmentConfigBuilder(this)
-                .setBleServiceUuid(Configuration.BleServiceUuid)
                 .setTenantId(Configuration.TenantId)
+                .build();
+
+        TapkeyBleAdvertisingFormat bleAdvertisingFormat = new TapkeyBleAdvertisingFormatBuilder()
+                .addV1Format(Configuration.BleServiceUuid)
+                .addV2Format(0x5754)
                 .build();
 
         _tokenProvider = new TokenProvider(this, new DemoBackendAccessor());
 
         _tapkeyServiceFactory = new TapkeyServiceFactoryBuilder(this)
                 .setConfig(tapkeyEnvironmentConfig)
+                .setBluetoothAdvertisingFormat(bleAdvertisingFormat)
                 .setTokenRefreshHandler(new TokenRefreshHandler() {
                     @Override
                     public Promise<String> refreshAuthenticationAsync(String s, CancellationToken cancellationToken) {
