@@ -125,8 +125,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         _btnLogout.setOnClickListener(button -> logout());
 
         _tvBoxId = view.findViewById(R.id.main_frag_et_box_id);
-        //_tvBoxId.setHint("e.g. C1-1F-8E-7C");
-        _tvBoxId.setText("C1-1F-8E-7C");
+        _tvBoxId.setHint("e.g. C1-1F-8E-7C");
 
         _btnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
         _btnTriggerLock.setOnClickListener(button -> triggerLock());
@@ -141,7 +140,6 @@ public class MainFragment extends Fragment implements LifecycleObserver {
 
         return view;
     }
-
 
     @Override
     public void onResume() {
@@ -209,7 +207,13 @@ public class MainFragment extends Fragment implements LifecycleObserver {
                                 Date keyValidBefore = key.getValidBefore();
 
                                 sb.append(String.format("• %s%s", boxId, System.lineSeparator()));
-                                sb.append(String.format("\tgrant starts: %s%s", sdf.format(grantValidFrom), System.lineSeparator()));
+                                if(null != grantValidFrom){
+                                    sb.append(String.format("\tgrant starts: %s%s", sdf.format(grantValidFrom), System.lineSeparator()));
+                                }
+                                else {
+                                    sb.append(String.format("\tgrant starts: undefined %s", System.lineSeparator()));
+                                }
+
                                 if (null != grantValidBefore) {
                                     sb.append(String.format("\tgrant ends: %s%s", sdf.format(keyValidBefore), System.lineSeparator()));
                                 }
@@ -371,6 +375,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
                 .continueOnUi(commandResult -> {
                     boolean success = false;
 
+                    String erroMessage = "";
                     // The CommandResultCode indicates if triggerLockAsync completed successfully
                     // or if an error occurred during the execution of the command.
                     // https://developers.tapkey.io/mobile/android/reference/Tapkey.MobileLib/latest/com/tapkey/mobile/model/CommandResult.CommandResultCode.html
@@ -405,31 +410,38 @@ public class MainFragment extends Fragment implements LifecycleObserver {
                         }
                         case LockCommunicationError: {
                             Log.e(TAG, "A transport-level error occurred when communicating with the locking device");
+                            erroMessage = "A transport-level error occurred when communicating with the locking device";
                             break;
                         }
                         case LockDateTimeInvalid: {
                             Log.e(TAG, "Lock date/time are invalid.");
+                            erroMessage = "A transport-level error occurred when communicating with the locking device";
                             break;
                         }
                         case ServerCommunicationError: {
                             Log.e(TAG, "An error occurred while trying to communicate with the Tapkey Trust Service (e.g. due to bad internet connection).");
+                            erroMessage = "An error occurred while trying to communicate with the Tapkey Trust Service (e.g. due to bad internet connection).";
                             break;
                         }
                         case TechnicalError: {
                             Log.e(TAG, "Some unspecific technical error has occurred.");
+                            erroMessage = "Some unspecific technical error has occurred.";
                             break;
                         }
                         case Unauthorized: {
                             Log.e(TAG, "Communication with the security backend succeeded but the user is not authorized for the given command on this locking device.");
+                            erroMessage = "Communication with the security backend succeeded but the user is not authorized for the given command on this locking device.";
                             break;
                         }
                         case UserSpecificError: {
                             // If there is a UserSpecificError we need to have look at the list
                             // of UserCommandResults in order to determine what exactly caused the error
                             // https://developers.tapkey.io/mobile/android/reference/Tapkey.MobileLib/latest/com/tapkey/mobile/model/CommandResult.UserCommandResult.html
+                            erroMessage = "triggerLockAsync failed with UserSpecificError";
                             List<CommandResult.UserCommandResult> userCommandResults = commandResult.getUserCommandResults();
                             for (CommandResult.UserCommandResult ucr : userCommandResults) {
                                 Log.e(TAG, "triggerLockAsync failed with UserSpecificError and UserCommandResultCode " + ucr.getUserCommandResultCode());
+                                erroMessage = "triggerLockAsync failed with UserSpecificError and UserCommandResultCode " + ucr.getUserCommandResultCode();
                             }
                             break;
                         }
@@ -442,13 +454,13 @@ public class MainFragment extends Fragment implements LifecycleObserver {
                         Toast.makeText(getContext(), "triggerLock successful", Toast.LENGTH_SHORT).show();
                     }
                     else {
-                        Toast.makeText(getContext(), "triggerLock error", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "triggerLock error:" + erroMessage, Toast.LENGTH_LONG).show();
                     }
 
                     return success;
                 })
                 .catchOnUi(e -> {
-                    Toast.makeText(getContext(), "triggerLock exception", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "triggerLock exception", Toast.LENGTH_LONG).show();
                     return false;
                 });
     }
