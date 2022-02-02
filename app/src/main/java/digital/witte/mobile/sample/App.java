@@ -39,8 +39,8 @@ public class App extends Application implements TapkeyAppContext {
                 .build();
 
         TapkeyBleAdvertisingFormat bleAdvertisingFormat = new TapkeyBleAdvertisingFormatBuilder()
-                .addV1Format(Configuration.BleServiceUuid)
-                .addV2Format(0x5754)
+                .addV1Format(Configuration.BleAdvertisingFormatV1)
+                .addV2Format(Configuration.BleAdvertisingFormatV2)
                 .build();
 
         _tokenProvider = new TokenProvider(this, new DemoBackendAccessor());

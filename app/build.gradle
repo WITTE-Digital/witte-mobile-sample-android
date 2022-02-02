@@ -1,18 +1,7 @@
 apply plugin: 'com.android.application'
 
-repositories {
-    /**
-     *  Maven repository for the Tapkey SDK.
-     */
-    maven { url "https://maven.tapkey.com" }
-
-    /**
-     * Maven repository for the WITTE mobile library.
-     */
-    maven {
-        url "https://dl.bintray.com/witte-digital/maven/"
-    }
-}
+def githubProperties = new Properties()
+githubProperties.load(new FileInputStream(rootProject.file("github.properties")))
 
 def getFlinkeyCustomerId() {
     Properties properties = new Properties()
@@ -50,8 +39,28 @@ def getFlinkeyApiManagerPassword() {
     return properties.getProperty("FLINKEY_API_MANAGER_PASSWORD")
 }
 
+repositories {
+    /**
+     *  Maven repository for the Tapkey SDK.
+     */
+    maven { url "https://maven.tapkey.com" }
+
+    /**
+     * Maven repository for the WITTE mobile library.
+     */
+    maven {
+        url "https://maven.pkg.github.com/WITTE-Digital/witte-mobile-library-for-android"
+        // At this point authentication is required to access the package
+        // https://github.community/t/download-from-github-package-registry-without-authentication/14407/148
+        credentials {
+            username = githubProperties['gpr.usr'] ?: System.getenv("GPR_USER")
+            password = githubProperties['gpr.key'] ?: System.getenv("GPR_API_KEY")
+        }
+    }
+}
+
 android {
-    compileSdkVersion 30
+    compileSdkVersion 31
 
     defaultConfig {
         applicationId "digital.witte.wittemobilelibrary.sample"
@@ -92,14 +101,14 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     // Standard dependencies
-    implementation 'androidx.appcompat:appcompat:1.3.1'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.1'
+    implementation 'androidx.appcompat:appcompat:1.4.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.3'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'android.arch.navigation:navigation-fragment:1.0.0'
 
     // WITTE Mobile Library
-    implementation 'digital.witte:witte-mobile-library:1.0.0'
+    implementation 'digital.witte:witte-mobile-library:2.0.0'
 
     // Tapkey SDK
     api 'com.tapkey.android:Tapkey.MobileLib:2.18.0.1'
