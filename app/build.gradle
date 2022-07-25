@@ -50,11 +50,11 @@ repositories {
      */
     maven {
         url "https://maven.pkg.github.com/WITTE-Digital/witte-mobile-library-for-android"
-        // At this point authentication is required to access the package
-        // https://github.community/t/download-from-github-package-registry-without-authentication/14407/148
+        // At this point authentication is required to access GitHub packages
+        // https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
         credentials {
-            username = githubProperties['gpr.usr'] ?: System.getenv("GPR_USER")
-            password = githubProperties['gpr.key'] ?: System.getenv("GPR_API_KEY")
+            username = githubProperties['gpr.usr'] ?: (System.getenv("GPR_USER") ?: '<GitHub user name>')
+            password = githubProperties['gpr.key'] ?: (System.getenv("GPR_API_KEY") ?: '<GitHub personal access token>')
         }
     }
 }

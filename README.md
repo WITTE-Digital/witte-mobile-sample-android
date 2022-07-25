@@ -14,8 +14,22 @@ Please visit the flinkey for Developers pages for a Getting Started guide and fu
 * Access to the flinkey UAT Portal with activated developer feature
 * A flinkey box in the flinkey UAT environment
 * An actual Android phone (the emulator will not work)
+* A GitHub Account to create a personal access token (PAT)
 
 ## Build & Run
+### Configure access to GitHub packages
+This app has a dependency to the [witte-mobile-mobile-library-for-android](https://github.com/WITTE-Digital/witte-mobile-library-for-android). The library is available through GitHub packages which requires authentication. [Create a personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) with the scope 'read:packages' and enter it as value of the variable 'password'. Your GitHub user name needs to be entered as value of the variable 'username'.
+
+```gradle
+// File: app/build.gradle
+maven {
+    url "https://maven.pkg.github.com/WITTE-Digital/witte-mobile-library-for-android"
+    credentials {
+        username = githubProperties['gpr.usr'] ?: (System.getenv("GPR_USER") ?: '<GitHub user name>')
+        password = githubProperties['gpr.key'] ?: (System.getenv("GPR_API_KEY") ?: '<GitHub personal access token>')
+    }
+}
+```
 
 ### Add your Customer Id, SDK Key, flinkey-API-Key and API Manager Credentials
 This sample includes requests to the flinkey API which require ids, keys and credentials. This allows to use the app in a self-contained way without having an app backend in place. 
