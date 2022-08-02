@@ -34,7 +34,7 @@ public class App extends Application implements TapkeyAppContext {
     public void onCreate() {
         super.onCreate();
 
-        TapkeyEnvironmentConfig tapkeyEnvironmentConfig = new TapkeyEnvironmentConfigBuilder(this)
+        TapkeyEnvironmentConfig tapkeyEnvironmentConfig = new TapkeyEnvironmentConfigBuilder()
                 .setTenantId(Configuration.TenantId)
                 .build();
 
