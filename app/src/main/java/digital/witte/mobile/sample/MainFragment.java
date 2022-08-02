@@ -1,10 +1,12 @@
 package digital.witte.mobile.sample;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -66,6 +68,16 @@ public class MainFragment extends Fragment implements LifecycleObserver {
             Log.d(TAG, "Permission denied");
         }
     });
+
+    private final ActivityResultLauncher<String[]> _requestMultiplePermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGrantedMap -> {
+        if (!isGrantedMap.containsValue(false)) {
+            Log.d(TAG, "All permissions granted");
+        }
+        else {
+            Log.d(TAG, "One or more permissions denied");
+        }
+    });
+
     private TextView _tvCustomerId;
     private TextView _tvApiKey;
     private TextView _tvSdkKey;
@@ -110,7 +122,6 @@ public class MainFragment extends Fragment implements LifecycleObserver {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-
         View view = inflater.inflate(R.layout.main_fragment, container, false);
         _tvCustomerId = view.findViewById(R.id.main_frag_tv_customer_id);
         _tvApiKey = view.findViewById(R.id.main_frag_tv_subscription_key);
@@ -126,6 +137,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
 
         _tvBoxId = view.findViewById(R.id.main_frag_et_box_id);
         _tvBoxId.setHint("e.g. C1-1F-8E-7C");
+        _tvBoxId.setText("C1-1F-8E-7C");
 
         _btnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
         _btnTriggerLock.setOnClickListener(button -> triggerLock());
@@ -148,22 +160,41 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         // check required permission
         Context context = getContext();
         if (null != context) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                if (null == _foregroundScanRegistration) {
-                    // Start scanning for flinkey boxes
-                    _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
+            // Check and request permissions
+            boolean scanningPermissionGranted = false;
+            if (Build.VERSION_CODES.S <= Build.VERSION.SDK_INT) {
+                scanningPermissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                        && ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+                if (!scanningPermissionGranted) {
+                    if (!shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_SCAN) && !shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_CONNECT)) {
+                        _requestMultiplePermissionLauncher.launch(new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT});
+                    }
+                    else {
+                        Log.e(TAG, "TODO: show permission rationale");
+                    }
                 }
-
-                if (null == _keyUpdateObserverRegistration) {
-                    // Register for digital key updates
-                    _keyUpdateObserverRegistration = _keyManager.getKeyUpdateObservable().addObserver(aVoid -> queryLocalKeys());
-                }
-            }
-            else if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
-                // TODO: show permission rationale
             }
             else {
-                _requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION);
+                scanningPermissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                if (!scanningPermissionGranted) {
+                    if (!shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
+                        _requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION);
+                    }
+                    else {
+                        Log.e(TAG, "TODO: show permission rationale");
+                    }
+                }
+            }
+
+            // Start scanning
+            if (scanningPermissionGranted && null == _foregroundScanRegistration) {
+                // Start scanning for flinkey boxes
+                _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
+            }
+
+            if (null == _keyUpdateObserverRegistration) {
+                // Register for digital key updates
+                _keyUpdateObserverRegistration = _keyManager.getKeyUpdateObservable().addObserver(aVoid -> queryLocalKeys());
             }
 
             updateUI();
@@ -178,6 +209,11 @@ public class MainFragment extends Fragment implements LifecycleObserver {
             // Stop scanning for flinkey boxes
             _foregroundScanRegistration.close();
             _foregroundScanRegistration = null;
+        }
+
+        if (null != _keyUpdateObserverRegistration) {
+            _keyUpdateObserverRegistration.close();
+            _keyUpdateObserverRegistration = null;
         }
     }
 
@@ -207,7 +243,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
                                 Date keyValidBefore = key.getValidBefore();
 
                                 sb.append(String.format("• %s%s", boxId, System.lineSeparator()));
-                                if(null != grantValidFrom){
+                                if (null != grantValidFrom) {
                                     sb.append(String.format("\tgrant starts: %s%s", sdf.format(grantValidFrom), System.lineSeparator()));
                                 }
                                 else {
@@ -337,6 +373,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
     /**
      * Opens of closes (triggers) a flinkey box.
      */
+    @SuppressLint("MissingPermission")
     private void triggerLock() {
         String boxId = _tvBoxId.getText().toString();
         if ("".equals(boxId)) {
@@ -364,14 +401,14 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         String bluetoothAddress = _bleLockScanner.getLock(physicalLockId).getBluetoothAddress();
 
         _bleBleLockCommunicator.executeCommandAsync(
-                bluetoothAddress,
-                physicalLockId,
-                tlcpConnection ->
-                {
-                    TriggerLockCommand triggerLockCommand = new DefaultTriggerLockCommandBuilder().build();
-                    return _commandExecutionFacade.executeStandardCommandAsync(tlcpConnection, triggerLockCommand, timeout);
-                },
-                timeout)
+                        bluetoothAddress,
+                        physicalLockId,
+                        tlcpConnection ->
+                        {
+                            TriggerLockCommand triggerLockCommand = new DefaultTriggerLockCommandBuilder().build();
+                            return _commandExecutionFacade.executeStandardCommandAsync(tlcpConnection, triggerLockCommand, timeout);
+                        },
+                        timeout)
                 .continueOnUi(commandResult -> {
                     boolean success = false;
 
