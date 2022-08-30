@@ -108,7 +108,7 @@ dependencies {
     implementation 'android.arch.navigation:navigation-fragment:1.0.0'
 
     // WITTE Mobile Library
-    implementation 'digital.witte:witte-mobile-library:2.0.0'
+    implementation 'digital.witte:witte-mobile-library:2.0.1'
 
     // Tapkey SDK
     api 'com.tapkey.android:Tapkey.MobileLib:2.21.2.2'
