@@ -137,7 +137,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
 
         _tvBoxId = view.findViewById(R.id.main_frag_et_box_id);
         _tvBoxId.setHint("e.g. C1-1F-8E-7C");
-        _tvBoxId.setText("C1-1F-8E-7C");
+        //_tvBoxId.setText("C1-1F-8E-7C");
 
         _btnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
         _btnTriggerLock.setOnClickListener(button -> triggerLock());
