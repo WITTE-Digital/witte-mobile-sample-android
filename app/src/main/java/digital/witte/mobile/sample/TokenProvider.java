@@ -16,6 +16,10 @@ import java.util.HashSet;
 
 import digital.witte.mobile.sample.backend.IBackendAccessor;
 
+/**
+ * The TokenProvider class is responsible for providing access tokens for authentication purposes.
+ * It retrieves the Tapkey access token via token exchange using the provided idToken.
+ */
 public class TokenProvider {
     private final static String AuthConfigScheme = "https";
     private final static String AuthConfigAuthority = "login.tapkey.com";
@@ -41,11 +45,23 @@ public class TokenProvider {
     private final Context _context;
     private final IBackendAccessor _backendAccessor;
 
+    /**
+     * Constructs a new TokenProvider object.
+     *
+     * @param context The context of the application.
+     * @param myBackend The backend accessor used to retrieve tokens.
+     */
     public TokenProvider(Context context, IBackendAccessor myBackend) {
         _context = context;
         _backendAccessor = myBackend;
     }
 
+    /**
+     * Retrieves the access token for the API.
+     *
+     * @return A Promise that resolves to a String representing the access token.
+     * @throws IllegalArgumentException if the flinkey idToken is null or empty.
+     */
     public Promise<String> AccessToken() {
         PromiseSource<String> promiseSource = new PromiseSource<>();
 

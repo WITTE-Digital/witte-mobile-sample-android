@@ -59,11 +59,19 @@ import digital.witte.wittemobilelibrary.box.BoxFeedbackV3Parser;
 import digital.witte.wittemobilelibrary.box.BoxIdConverter;
 import digital.witte.wittemobilelibrary.box.BoxState;
 
+/**
+ * The MainFragment class represents the main fragment of the application.
+ * It extends the Fragment class and implements the LifecycleObserver interface.
+ * This fragment is responsible for handling user interactions and displaying UI elements.
+ */
 public class MainFragment extends Fragment implements LifecycleObserver {
 
     private static final String TAG = MainFragment.class.getCanonicalName();
-
-    private final ArrayList<KeyDetails> _keys = new ArrayList<>();
+    
+    /**
+     * Activity result launcher for requesting permission.
+     * This launcher is used to request a specific permission and handle the result.
+     */
     private final ActivityResultLauncher<String> _requestPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
         if (isGranted) {
             Log.d(TAG, "Permission granted");
@@ -73,6 +81,11 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         }
     });
 
+    /**
+     * Activity result launcher for requesting multiple permissions.
+     * It registers for activity result using ActivityResultContracts.RequestMultiplePermissions
+     * and handles the result by checking if all permissions are granted or if any permission is denied.
+     */
     private final ActivityResultLauncher<String[]> _requestMultiplePermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGrantedMap -> {
         if (!isGrantedMap.containsValue(false)) {
             Log.d(TAG, "All permissions granted");
@@ -82,25 +95,69 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         }
     });
 
+    // An ArrayList to store KeyDetails objects
+    private final ArrayList<KeyDetails> _keys = new ArrayList<>();
+
+    // A TextView to display local keys
     private TextView mTvLocalKeys;
+
+    // An EditText to input box id
     private EditText mTvBoxId;
+
+    // A Button to trigger lock
     private Button mBtnTriggerLock;
+
+    // A Button to unlock
     private Button mBtnUnlock;
+
+    // A Button to lock
     private Button mBtnLock;
+
+    // A Button to login
     private Button mBtnLogin;
+
+    // A Button to logout
     private Button mBtnLogout;
+
+    // A Button to query local keys
     private Button mBtnQueryLocalKeys;
+
+    // A TokenProvider to manage tokens
     private TokenProvider mTokenProvider;
+
+    // A BleLockCommunicator to manage BLE lock communication
     private BleLockCommunicator mBleBleLockCommunicator;
+
+    // A BleLockScanner to scan for BLE locks
     private BleLockScanner mBleLockScanner;
+
+    // A KeyManager to manage keys
     private KeyManager mKeyManager;
+
+    // A CommandExecutionFacade to execute commands
     private CommandExecutionFacade mCommandExecutionFacade;
+
+    // A UserManager to manage users
     private UserManager mUserManager;
+
+    // A NotificationManager to manage notifications
     private NotificationManager mNotificationManager;
+
+    // An ObserverRegistration for key update observer
     private ObserverRegistration mKeyUpdateObserverRegistration;
+
+    // An ObserverRegistration for foreground scan observer
     private ObserverRegistration mForegroundScanRegistration;
+
+    // A ProgressDialog to display progress
     private ProgressDialog mProgressDialog;
 
+    /**
+     * Called when the fragment is attached to a context.
+     * Initializes various dependencies required by the fragment.
+     *
+     * @param context The context to which the fragment is attached.
+     */
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
@@ -121,6 +178,14 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         }
     }
 
+    /**
+     * Creates and returns the View for the fragment's UI.
+     *
+     * @param inflater           The LayoutInflater object that can be used to inflate any views in the fragment.
+     * @param container          The parent view that the fragment's UI should be attached to.
+     * @param savedInstanceState The saved instance state of the fragment.
+     * @return The View for the fragment's UI.
+     */
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -160,6 +225,12 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         return view;
     }
 
+    /**
+     * Called when the fragment is resumed. This method is called after the fragment has been
+     * visible to the user. It checks for required permissions, requests them if necessary,
+     * starts scanning for flinkey boxes, and registers for digital key updates.
+     * It also updates the UI.
+     */
     @Override
     public void onResume() {
         super.onResume();
@@ -208,6 +279,10 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         }
     }
 
+    /**
+     * Called when the fragment is no longer in the foreground and is being paused.
+     * This method is responsible for stopping the scanning for flinkey boxes and closing any observer registrations.
+     */
     @Override
     public void onPause() {
         super.onPause();
@@ -225,7 +300,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
     }
 
     /**
-     * Checks locally available digital keys.
+     * Queries the local keys for the logged in user and displays the result in the UI.
      */
     private void queryLocalKeys() {
         if (isUserLoggedIn()) {
@@ -371,12 +446,19 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         mUserManager.logOutAsync(userId, CancellationTokens.None).finallyOnUi(this::updateUI);
     }
 
+    /**
+     * Unlocks the box by building an unlock command and executing it.
+     */
     private void unlock() {
         byte[] bytes = BoxCommandBuilder.buildUnlockCarUnlockBox();
         String boxCommandData = Base64.getEncoder().encodeToString(bytes);
         executeBoxCommand(boxCommandData);
     }
 
+    
+    /**
+     * Locks the box by building a lock box command and executing it.
+     */
     private void lock() {
         byte[] bytes = BoxCommandBuilder.buildLockCarLockBox();
         String boxCommandData = Base64.getEncoder().encodeToString(bytes);
@@ -391,6 +473,11 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         executeBoxCommand(null);
     }
 
+    /**
+     * Executes a box command.
+     * 
+     * @param boxCommandData The data for the box command.
+     */
     private void executeBoxCommand(String boxCommandData) {
         String boxId = mTvBoxId.getText().toString();
         if ("".equals(boxId)) {
