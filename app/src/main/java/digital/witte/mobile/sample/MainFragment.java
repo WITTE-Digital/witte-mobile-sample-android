@@ -21,6 +21,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.LifecycleObserver;
@@ -36,30 +37,41 @@ import com.tapkey.mobile.manager.NotificationManager;
 import com.tapkey.mobile.manager.UserManager;
 import com.tapkey.mobile.model.CommandResult;
 import com.tapkey.mobile.model.KeyDetails;
+import com.tapkey.mobile.model.UserGrant;
 import com.tapkey.mobile.tlcp.commands.DefaultTriggerLockCommandBuilder;
-import com.tapkey.mobile.utils.Func1;
 import com.tapkey.mobile.utils.ObserverRegistration;
 
-import net.tpky.mc.model.Grant;
 import net.tpky.mc.tlcp.model.TriggerLockCommand;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
 import digital.witte.mobile.sample.backend.DemoBackendAccessor;
+import digital.witte.wittemobilelibrary.box.BoxCommandBuilder;
 import digital.witte.wittemobilelibrary.box.BoxFeedback;
+import digital.witte.wittemobilelibrary.box.BoxFeedbackV3;
+import digital.witte.wittemobilelibrary.box.BoxFeedbackV3Parser;
 import digital.witte.wittemobilelibrary.box.BoxIdConverter;
 import digital.witte.wittemobilelibrary.box.BoxState;
 
+/**
+ * The MainFragment class represents the main fragment of the application.
+ * It extends the Fragment class and implements the LifecycleObserver interface.
+ * This fragment is responsible for handling user interactions and displaying UI elements.
+ */
 public class MainFragment extends Fragment implements LifecycleObserver {
 
     private static final String TAG = MainFragment.class.getCanonicalName();
-
-    private final ArrayList<KeyDetails> _keys = new ArrayList<>();
+    
+    /**
+     * Activity result launcher for requesting permission.
+     * This launcher is used to request a specific permission and handle the result.
+     */
     private final ActivityResultLauncher<String> _requestPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
         if (isGranted) {
             Log.d(TAG, "Permission granted");
@@ -69,6 +81,11 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         }
     });
 
+    /**
+     * Activity result launcher for requesting multiple permissions.
+     * It registers for activity result using ActivityResultContracts.RequestMultiplePermissions
+     * and handles the result by checking if all permissions are granted or if any permission is denied.
+     */
     private final ActivityResultLauncher<String[]> _requestMultiplePermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), isGrantedMap -> {
         if (!isGrantedMap.containsValue(false)) {
             Log.d(TAG, "All permissions granted");
@@ -78,27 +95,69 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         }
     });
 
-    private TextView _tvCustomerId;
-    private TextView _tvApiKey;
-    private TextView _tvSdkKey;
-    private TextView _tvUserId;
-    private TextView _tvLocalKeys;
-    private EditText _tvBoxId;
-    private Button _btnTriggerLock;
-    private Button _btnLogin;
-    private Button _btnLogout;
-    private Button _btnQueryLocalKeys;
-    private TokenProvider _tokenProvider;
-    private BleLockCommunicator _bleBleLockCommunicator;
-    private BleLockScanner _bleLockScanner;
-    private KeyManager _keyManager;
-    private CommandExecutionFacade _commandExecutionFacade;
-    private UserManager _userManager;
-    private NotificationManager _notificationManager;
-    private ObserverRegistration _keyUpdateObserverRegistration;
-    private ObserverRegistration _foregroundScanRegistration;
-    private ProgressDialog _progressDialog;
+    // An ArrayList to store KeyDetails objects
+    private final ArrayList<KeyDetails> _keys = new ArrayList<>();
 
+    // A TextView to display local keys
+    private TextView mTvLocalKeys;
+
+    // An EditText to input box id
+    private EditText mTvBoxId;
+
+    // A Button to trigger lock
+    private Button mBtnTriggerLock;
+
+    // A Button to unlock
+    private Button mBtnUnlock;
+
+    // A Button to lock
+    private Button mBtnLock;
+
+    // A Button to login
+    private Button mBtnLogin;
+
+    // A Button to logout
+    private Button mBtnLogout;
+
+    // A Button to query local keys
+    private Button mBtnQueryLocalKeys;
+
+    // A TokenProvider to manage tokens
+    private TokenProvider mTokenProvider;
+
+    // A BleLockCommunicator to manage BLE lock communication
+    private BleLockCommunicator mBleBleLockCommunicator;
+
+    // A BleLockScanner to scan for BLE locks
+    private BleLockScanner mBleLockScanner;
+
+    // A KeyManager to manage keys
+    private KeyManager mKeyManager;
+
+    // A CommandExecutionFacade to execute commands
+    private CommandExecutionFacade mCommandExecutionFacade;
+
+    // A UserManager to manage users
+    private UserManager mUserManager;
+
+    // A NotificationManager to manage notifications
+    private NotificationManager mNotificationManager;
+
+    // An ObserverRegistration for key update observer
+    private ObserverRegistration mKeyUpdateObserverRegistration;
+
+    // An ObserverRegistration for foreground scan observer
+    private ObserverRegistration mForegroundScanRegistration;
+
+    // A ProgressDialog to display progress
+    private ProgressDialog mProgressDialog;
+
+    /**
+     * Called when the fragment is attached to a context.
+     * Initializes various dependencies required by the fragment.
+     *
+     * @param context The context to which the fragment is attached.
+     */
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
@@ -107,45 +166,58 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         if (null != activity) {
             App app = ((App) activity.getApplication());
             if (null != app) {
-                _tokenProvider = app.getTokenProvider();
+                mTokenProvider = app.getTokenProvider();
                 TapkeyServiceFactory serviceFactory = app.getTapkeyServiceFactory();
-                _bleLockScanner = serviceFactory.getBleLockScanner();
-                _bleBleLockCommunicator = serviceFactory.getBleLockCommunicator();
-                _keyManager = serviceFactory.getKeyManager();
-                _commandExecutionFacade = serviceFactory.getCommandExecutionFacade();
-                _userManager = serviceFactory.getUserManager();
-                _notificationManager = serviceFactory.getNotificationManager();
+                mBleLockScanner = serviceFactory.getBleLockScanner();
+                mBleBleLockCommunicator = serviceFactory.getBleLockCommunicator();
+                mKeyManager = serviceFactory.getKeyManager();
+                mCommandExecutionFacade = serviceFactory.getCommandExecutionFacade();
+                mUserManager = serviceFactory.getUserManager();
+                mNotificationManager = serviceFactory.getNotificationManager();
             }
         }
     }
 
+    /**
+     * Creates and returns the View for the fragment's UI.
+     *
+     * @param inflater           The LayoutInflater object that can be used to inflate any views in the fragment.
+     * @param container          The parent view that the fragment's UI should be attached to.
+     * @param savedInstanceState The saved instance state of the fragment.
+     * @return The View for the fragment's UI.
+     */
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.main_fragment, container, false);
-        _tvCustomerId = view.findViewById(R.id.main_frag_tv_customer_id);
-        _tvApiKey = view.findViewById(R.id.main_frag_tv_subscription_key);
-        _tvSdkKey = view.findViewById(R.id.main_frag_tv_sdk_key);
-        _tvUserId = view.findViewById(R.id.main_frag_tv_user_id);
-        _tvLocalKeys = view.findViewById(R.id.main_frag_tv_local_keys);
+        TextView mTvCustomerId = view.findViewById(R.id.main_frag_tv_customer_id);
+        TextView _tvApiKey = view.findViewById(R.id.main_frag_tv_subscription_key);
+        TextView _tvSdkKey = view.findViewById(R.id.main_frag_tv_sdk_key);
+        TextView _tvUserId = view.findViewById(R.id.main_frag_tv_user_id);
+        mTvLocalKeys = view.findViewById(R.id.main_frag_tv_local_keys);
 
-        _btnLogin = view.findViewById(R.id.main_frag_btn_authenticate);
-        _btnLogin.setOnClickListener(button -> login());
+        mBtnLogin = view.findViewById(R.id.main_frag_btn_authenticate);
+        mBtnLogin.setOnClickListener(button -> login());
 
-        _btnLogout = view.findViewById(R.id.main_frag_btn_logout);
-        _btnLogout.setOnClickListener(button -> logout());
+        mBtnLogout = view.findViewById(R.id.main_frag_btn_logout);
+        mBtnLogout.setOnClickListener(button -> logout());
 
-        _tvBoxId = view.findViewById(R.id.main_frag_et_box_id);
-        _tvBoxId.setHint("e.g. C1-1F-8E-7C");
-        //_tvBoxId.setText("C1-1F-8E-7C");
+        mTvBoxId = view.findViewById(R.id.main_frag_et_box_id);
+        mTvBoxId.setHint("e.g. C1-1F-8E-7C");        
 
-        _btnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
-        _btnTriggerLock.setOnClickListener(button -> triggerLock());
+        mBtnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
+        mBtnTriggerLock.setOnClickListener(button -> triggerLock());
 
-        _btnQueryLocalKeys = view.findViewById(R.id.main_frag_btn_query_local_keys);
-        _btnQueryLocalKeys.setOnClickListener(button -> queryLocalKeys());
+        mBtnUnlock = view.findViewById(R.id.main_frag_btn_unlock);
+        mBtnUnlock.setOnClickListener(button -> unlock());
 
-        _tvCustomerId.setText(String.format(Locale.US, "%d", DemoBackendAccessor.FlinkeyCustomerId));
+        mBtnLock = view.findViewById(R.id.main_frag_btn_lock);
+        mBtnLock.setOnClickListener(button -> lock());
+
+        mBtnQueryLocalKeys = view.findViewById(R.id.main_frag_btn_query_local_keys);
+        mBtnQueryLocalKeys.setOnClickListener(button -> queryLocalKeys());
+
+        mTvCustomerId.setText(String.format(Locale.US, "%d", DemoBackendAccessor.FlinkeyCustomerId));
         _tvApiKey.setText(DemoBackendAccessor.FlinkeyApiKey);
         _tvSdkKey.setText(DemoBackendAccessor.FlinkeySdkKey);
         _tvUserId.setText(String.format(Locale.US, "%d", DemoBackendAccessor.FlinkeyUserId));
@@ -153,6 +225,12 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         return view;
     }
 
+    /**
+     * Called when the fragment is resumed. This method is called after the fragment has been
+     * visible to the user. It checks for required permissions, requests them if necessary,
+     * starts scanning for flinkey boxes, and registers for digital key updates.
+     * It also updates the UI.
+     */
     @Override
     public void onResume() {
         super.onResume();
@@ -187,90 +265,84 @@ public class MainFragment extends Fragment implements LifecycleObserver {
             }
 
             // Start scanning
-            if (scanningPermissionGranted && null == _foregroundScanRegistration) {
+            if (scanningPermissionGranted && null == mForegroundScanRegistration) {
                 // Start scanning for flinkey boxes
-                _foregroundScanRegistration = _bleLockScanner.startForegroundScan();
+                mForegroundScanRegistration = mBleLockScanner.startForegroundScan();
             }
 
-            if (null == _keyUpdateObserverRegistration) {
+            if (null == mKeyUpdateObserverRegistration) {
                 // Register for digital key updates
-                _keyUpdateObserverRegistration = _keyManager.getKeyUpdateObservable().addObserver(aVoid -> queryLocalKeys());
+                mKeyUpdateObserverRegistration = mKeyManager.getKeyUpdateObservable().addObserver(aVoid -> queryLocalKeys());
             }
 
             updateUI();
         }
     }
 
+    /**
+     * Called when the fragment is no longer in the foreground and is being paused.
+     * This method is responsible for stopping the scanning for flinkey boxes and closing any observer registrations.
+     */
     @Override
     public void onPause() {
         super.onPause();
 
-        if (null != _foregroundScanRegistration) {
+        if (null != mForegroundScanRegistration) {
             // Stop scanning for flinkey boxes
-            _foregroundScanRegistration.close();
-            _foregroundScanRegistration = null;
+            mForegroundScanRegistration.close();
+            mForegroundScanRegistration = null;
         }
 
-        if (null != _keyUpdateObserverRegistration) {
-            _keyUpdateObserverRegistration.close();
-            _keyUpdateObserverRegistration = null;
+        if (null != mKeyUpdateObserverRegistration) {
+            mKeyUpdateObserverRegistration.close();
+            mKeyUpdateObserverRegistration = null;
         }
     }
 
     /**
-     * Checks locally available digital keys.
+     * Queries the local keys for the logged in user and displays the result in the UI.
      */
     private void queryLocalKeys() {
         if (isUserLoggedIn()) {
             // query for this user's keys
-            String userId = _userManager.getUsers().get(0);
-            _keyManager.queryLocalKeysAsync(userId, CancellationTokens.None)
-                    .continueOnUi((Func1<List<KeyDetails>, Void, Exception>) keyDetails -> {
-                        _keys.clear();
-                        _keys.addAll(keyDetails);
+            String userId = mUserManager.getUsers().get(0);
+            List<KeyDetails> keys = mKeyManager.getLocalKeys(userId);
+            _keys.clear();
+            _keys.addAll(keys);
 
-                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US);
-                        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-                        StringBuilder sb = new StringBuilder();
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US);
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            StringBuilder sb = new StringBuilder();
 
-                        for (KeyDetails key : keyDetails) {
-                            Grant grant = key.getGrant();
-                            if (null != grant) {
-                                String physicalLockId = grant.getBoundLock().getPhysicalLockId();
-                                String boxId = BoxIdConverter.toBoxId(physicalLockId);
-                                Date grantValidFrom = grant.getValidFrom();
-                                Date grantValidBefore = grant.getValidBefore();
-                                Date keyValidBefore = key.getValidBefore();
+            for (KeyDetails key : keys) {
+                UserGrant grant = key.getGrant();
+                if (null != grant) {
+                    String physicalLockId = grant.getBoundLock().getPhysicalLockId();
+                    String boxId = BoxIdConverter.toBoxId(physicalLockId);
+                    Date grantValidFrom = grant.getValidFrom();
+                    Date grantValidBefore = grant.getValidBefore();
+                    Date keyValidBefore = key.getValidBefore();
 
-                                sb.append(String.format("• %s%s", boxId, System.lineSeparator()));
-                                if (null != grantValidFrom) {
-                                    sb.append(String.format("\tgrant starts: %s%s", sdf.format(grantValidFrom), System.lineSeparator()));
-                                }
-                                else {
-                                    sb.append(String.format("\tgrant starts: undefined %s", System.lineSeparator()));
-                                }
+                    sb.append(String.format("• %s%s", boxId, System.lineSeparator()));
+                    if (null != grantValidFrom) {
+                        sb.append(String.format("\tgrant starts: %s%s", sdf.format(grantValidFrom), System.lineSeparator()));
+                    }
+                    else {
+                        sb.append(String.format("\tgrant starts: undefined %s", System.lineSeparator()));
+                    }
 
-                                if (null != grantValidBefore) {
-                                    sb.append(String.format("\tgrant ends: %s%s", sdf.format(keyValidBefore), System.lineSeparator()));
-                                }
-                                else {
-                                    sb.append(String.format("\tgrant ends: unlimited%s", System.lineSeparator()));
-                                }
+                    if (null != grantValidBefore) {
+                        sb.append(String.format("\tgrant ends: %s%s", sdf.format(keyValidBefore), System.lineSeparator()));
+                    }
+                    else {
+                        sb.append(String.format("\tgrant ends: unlimited%s", System.lineSeparator()));
+                    }
 
-                                sb.append(String.format("\tvalid before: %s%s", sdf.format(keyValidBefore), System.lineSeparator()));
-                            }
-                        }
+                    sb.append(String.format("\tvalid before: %s%s", sdf.format(keyValidBefore), System.lineSeparator()));
+                }
+            }
 
-                        _tvLocalKeys.setText(sb.toString());
-
-                        return null;
-                    })
-                    .catchOnUi(e -> {
-                        Log.e(TAG, "queryLocalKeys failed ", e);
-                        return null;
-                    })
-                    // make sure, we don't miss any exceptions.
-                    .conclude();
+            mTvLocalKeys.setText(sb.toString());
         }
     }
 
@@ -282,8 +354,8 @@ public class MainFragment extends Fragment implements LifecycleObserver {
     private boolean isUserLoggedIn() {
         boolean isLoggedIn = false;
 
-        if (null != _userManager) {
-            List<String> userIds = _userManager.getUsers();
+        if (null != mUserManager) {
+            List<String> userIds = mUserManager.getUsers();
             if (1 == userIds.size()) {
                 isLoggedIn = true;
             }
@@ -297,19 +369,23 @@ public class MainFragment extends Fragment implements LifecycleObserver {
      */
     private void updateUI() {
         if (isUserLoggedIn()) {
-            _btnLogout.setEnabled(true);
-            _btnLogin.setEnabled(false);
-            _btnTriggerLock.setEnabled(true);
-            _btnQueryLocalKeys.setEnabled(true);
-            _tvBoxId.setEnabled(true);
+            mBtnLogout.setEnabled(true);
+            mBtnLogin.setEnabled(false);
+            mBtnTriggerLock.setEnabled(true);
+            mBtnUnlock.setEnabled(true);
+            mBtnLock.setEnabled(true);
+            mBtnQueryLocalKeys.setEnabled(true);
+            mTvBoxId.setEnabled(true);
         }
         else {
-            _btnLogout.setEnabled(false);
-            _btnLogin.setEnabled(true);
-            _btnTriggerLock.setEnabled(false);
-            _btnQueryLocalKeys.setEnabled(false);
-            _tvBoxId.setEnabled(false);
-            _tvLocalKeys.setText("");
+            mBtnLogout.setEnabled(false);
+            mBtnLogin.setEnabled(true);
+            mBtnTriggerLock.setEnabled(false);
+            mBtnUnlock.setEnabled(false);
+            mBtnLock.setEnabled(false);
+            mBtnQueryLocalKeys.setEnabled(false);
+            mTvBoxId.setEnabled(false);
+            mTvLocalKeys.setText("");
         }
     }
 
@@ -321,15 +397,15 @@ public class MainFragment extends Fragment implements LifecycleObserver {
             return;
         }
 
-        _progressDialog = ProgressDialog.show(getContext(), "", "Log in...", true);
+        mProgressDialog = ProgressDialog.show(getContext(), "", "Log in...", true);
 
         // retrieve an access token
-        _tokenProvider.AccessToken().continueOnUi(accessToken -> {
+        mTokenProvider.AccessToken().continueOnUi(accessToken -> {
             if (null != accessToken && !"".equals(accessToken)) {
                 // login with access token
-                _userManager.logInAsync(accessToken, CancellationTokens.None).continueOnUi(userId -> {
+                mUserManager.logInAsync(accessToken, CancellationTokens.None).continueOnUi(userId -> {
                     // synchronize digital keys
-                    _notificationManager.pollForNotificationsAsync(CancellationTokens.None)
+                    mNotificationManager.pollForNotificationsAsync(CancellationTokens.None)
                             .catchOnUi(e -> {
                                 Log.e(TAG, "Failed to poll for notifications.", e);
                                 return null;
@@ -341,10 +417,10 @@ public class MainFragment extends Fragment implements LifecycleObserver {
                     e.printStackTrace();
                     return null;
                 }).finallyOnUi(() -> {
-                    if (null != _progressDialog) {
-                        _progressDialog.dismiss();
+                    if (null != mProgressDialog) {
+                        mProgressDialog.dismiss();
                     }
-                    _progressDialog = null;
+                    mProgressDialog = null;
                 });
             }
             return null;
@@ -352,10 +428,10 @@ public class MainFragment extends Fragment implements LifecycleObserver {
             e.printStackTrace();
             return null;
         }).finallyOnUi(() -> {
-            if (null != _progressDialog) {
-                _progressDialog.dismiss();
+            if (null != mProgressDialog) {
+                mProgressDialog.dismiss();
             }
-            _progressDialog = null;
+            mProgressDialog = null;
         });
     }
 
@@ -366,8 +442,27 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         if (!isUserLoggedIn()) {
             return;
         }
-        String userId = _userManager.getUsers().get(0);
-        _userManager.logOutAsync(userId, CancellationTokens.None).finallyOnUi(this::updateUI);
+        String userId = mUserManager.getUsers().get(0);
+        mUserManager.logOutAsync(userId, CancellationTokens.None).finallyOnUi(this::updateUI);
+    }
+
+    /**
+     * Unlocks the box by building an unlock command and executing it.
+     */
+    private void unlock() {
+        byte[] bytes = BoxCommandBuilder.buildUnlockCarUnlockBox();
+        String boxCommandData = Base64.getEncoder().encodeToString(bytes);
+        executeBoxCommand(boxCommandData);
+    }
+
+    
+    /**
+     * Locks the box by building a lock box command and executing it.
+     */
+    private void lock() {
+        byte[] bytes = BoxCommandBuilder.buildLockCarLockBox();
+        String boxCommandData = Base64.getEncoder().encodeToString(bytes);
+        executeBoxCommand(boxCommandData);
     }
 
     /**
@@ -375,7 +470,16 @@ public class MainFragment extends Fragment implements LifecycleObserver {
      */
     @SuppressLint("MissingPermission")
     private void triggerLock() {
-        String boxId = _tvBoxId.getText().toString();
+        executeBoxCommand(null);
+    }
+
+    /**
+     * Executes a box command.
+     * 
+     * @param boxCommandData The data for the box command.
+     */
+    private void executeBoxCommand(String boxCommandData) {
+        String boxId = mTvBoxId.getText().toString();
         if ("".equals(boxId)) {
             Toast.makeText(getContext(), "Please enter your box ID.", Toast.LENGTH_SHORT).show();
             return;
@@ -384,7 +488,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         String physicalLockId;
         try {
             physicalLockId = BoxIdConverter.toPhysicalLockId(boxId);
-            if (!_bleLockScanner.isLockNearby(physicalLockId)) {
+            if (!mBleLockScanner.isLockNearby(physicalLockId)) {
                 Toast.makeText(getContext(), "The box is not in reach.", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -394,19 +498,40 @@ public class MainFragment extends Fragment implements LifecycleObserver {
             return;
         }
 
+        if (ActivityCompat.checkSelfPermission(this.requireActivity(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+
         // 60s timeout
         final int timeoutInMs = 60 * 1000;
         CancellationToken timeout = CancellationTokens.fromTimeout(timeoutInMs);
+        String bluetoothAddress = mBleLockScanner.getLock(physicalLockId).getBluetoothAddress();
 
-        String bluetoothAddress = _bleLockScanner.getLock(physicalLockId).getBluetoothAddress();
+        mProgressDialog = ProgressDialog.show(this.requireActivity(),"", "");
 
-        _bleBleLockCommunicator.executeCommandAsync(
+        mBleBleLockCommunicator.executeCommandAsync(
                         bluetoothAddress,
                         physicalLockId,
                         tlcpConnection ->
                         {
-                            TriggerLockCommand triggerLockCommand = new DefaultTriggerLockCommandBuilder().build();
-                            return _commandExecutionFacade.executeStandardCommandAsync(tlcpConnection, triggerLockCommand, timeout);
+                            TriggerLockCommand triggerLockCommand = null;
+                            if (null != boxCommandData) {
+                                triggerLockCommand = new DefaultTriggerLockCommandBuilder()
+                                        .setCustomCommandData(Base64.getDecoder().decode(boxCommandData))
+                                        .build();
+                            }
+                            else {
+                                triggerLockCommand = new DefaultTriggerLockCommandBuilder().build();
+                            }
+
+                            return mCommandExecutionFacade.executeStandardCommandAsync(tlcpConnection, triggerLockCommand, timeout);
                         },
                         timeout)
                 .continueOnUi(commandResult -> {
@@ -427,16 +552,34 @@ public class MainFragment extends Fragment implements LifecycleObserver {
 
                                 byte[] responseData = (byte[]) object;
                                 try {
-                                    BoxFeedback boxFeedback = BoxFeedback.create(responseData);
-                                    int boxState = boxFeedback.getBoxState();
-                                    if (BoxState.UNLOCKED == boxState) {
-                                        Log.d(TAG, "Box has been opened");
+                                    // the legacy flinkey box v2.4 returns a 10 byte response
+                                    // The same is true for the recent flinkey box 3.3 (aka flinkey BLE) when used without box commands
+                                    if (10 == responseData.length) {
+                                        BoxFeedback boxFeedback = BoxFeedback.create(responseData);
+                                        int boxState = boxFeedback.getBoxState();
+                                        if (BoxState.UNLOCKED == boxState) {
+                                            Log.d(TAG, "Box has been opened");
+                                        }
+                                        else if (BoxState.LOCKED == boxState) {
+                                            Log.d(TAG, "Box has been closed");
+                                        }
+                                        else if (BoxState.DRAWER_OPEN == boxState) {
+                                            Log.d(TAG, "The drawer of the Box is open.");
+                                        }
                                     }
-                                    else if (BoxState.LOCKED == boxState) {
-                                        Log.d(TAG, "Box has been closed");
-                                    }
-                                    else if (BoxState.DRAWER_OPEN == boxState) {
-                                        Log.d(TAG, "The drawer of the Box is open.");
+                                    else {
+                                        // When used with box commands the flinkey box 3.3 returns a response that is less or more
+                                        // than 10 bytes but never exactly 10 bytes.
+                                        BoxFeedbackV3 boxFeedbackV3 = BoxFeedbackV3Parser.parse(responseData);
+                                        if(boxFeedbackV3.isDrawerState()) {
+                                            Log.d(TAG, "The drawer of the Box is open.");
+                                        }
+                                        else if(boxFeedbackV3.isDrawerAccessibility()) {
+                                            Log.d(TAG, "Box has been unlocked");
+                                        }
+                                        else {
+                                            Log.d(TAG, "Box has been locked");
+                                        }
                                     }
                                 }
                                 catch (IllegalArgumentException iaEx) {
@@ -488,16 +631,22 @@ public class MainFragment extends Fragment implements LifecycleObserver {
                     }
 
                     if (success) {
-                        Toast.makeText(getContext(), "triggerLock successful", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "executeBoxCommand successful", Toast.LENGTH_SHORT).show();
                     }
                     else {
-                        Toast.makeText(getContext(), "triggerLock error:" + erroMessage, Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), "executeBoxCommand error:" + erroMessage, Toast.LENGTH_LONG).show();
                     }
 
                     return success;
                 })
+                .finallyOnUi(() -> {
+                    if (null != mProgressDialog) {
+                        mProgressDialog.dismiss();
+                    }
+                    mProgressDialog = null;
+                })
                 .catchOnUi(e -> {
-                    Toast.makeText(getContext(), "triggerLock exception", Toast.LENGTH_LONG).show();
+                    Toast.makeText(getContext(), "executeBoxCommand exception", Toast.LENGTH_LONG).show();
                     return false;
                 });
     }

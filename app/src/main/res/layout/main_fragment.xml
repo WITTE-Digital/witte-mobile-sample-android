@@ -99,11 +99,30 @@
                 android:layout_marginBottom="16dp"
                 android:hint="Enter your Box ID (e.g. 'A1-B2-C3-D4')"/>
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:textStyle="bold"
+                android:text="Commands:"/>
+
             <Button
                 android:id="@+id/main_frag_btn_trigger"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Trigger Lock" />
+                android:text="TRIGGER" />
+
+            <Button
+                android:id="@+id/main_frag_btn_unlock"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="UNLOCK" />
+
+            <Button
+                android:id="@+id/main_frag_btn_lock"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="LOCK" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -112,17 +131,17 @@
                 android:textStyle="bold"
                 android:text="Keys:"/>
 
-            <TextView
-                android:id="@+id/main_frag_tv_local_keys"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"/>
-
             <Button
                 android:id="@+id/main_frag_btn_query_local_keys"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Query Local Keys" />
+
+            <TextView
+                android:id="@+id/main_frag_tv_local_keys"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"/>
         </LinearLayout>
     </ScrollView>
 </androidx.constraintlayout.widget.ConstraintLayout>

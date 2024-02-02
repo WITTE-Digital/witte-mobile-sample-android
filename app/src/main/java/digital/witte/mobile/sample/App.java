@@ -30,6 +30,10 @@ public class App extends Application implements TapkeyAppContext {
      */
     private TokenProvider _tokenProvider;
 
+    /**
+     * Called when the application is first created. This method is responsible for initializing the application 
+     * and setting up necessary configurations.
+     */
     @Override
     public void onCreate() {
         super.onCreate();
@@ -68,11 +72,21 @@ public class App extends Application implements TapkeyAppContext {
         PollingScheduler.register(this, uniqueJobId, PollingScheduler.DEFAULT_INTERVAL);
     }
 
+    /**
+     * Returns the TapkeyServiceFactory instance.
+     *
+     * @return The TapkeyServiceFactory instance.
+     */
     @Override
     public TapkeyServiceFactory getTapkeyServiceFactory() {
         return _tapkeyServiceFactory;
     }
 
+    /**
+     * Returns the TokenProvider instance used by the application.
+     *
+     * @return The TokenProvider instance.
+     */
     public TokenProvider getTokenProvider() {
         return _tokenProvider;
     }

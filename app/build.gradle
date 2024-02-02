@@ -60,12 +60,12 @@ repositories {
 }
 
 android {
-    compileSdkVersion 31
+    compileSdkVersion 34
 
     defaultConfig {
         applicationId "digital.witte.wittemobilelibrary.sample"
         minSdkVersion 26
-        targetSdkVersion 31
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -95,29 +95,39 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+    namespace 'digital.witte.mobile.sample'
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     // Standard dependencies
-    implementation 'androidx.appcompat:appcompat:1.4.2'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'android.arch.navigation:navigation-fragment:1.0.0'
 
     // WITTE Mobile Library
-    implementation 'digital.witte:witte-mobile-library:2.0.1'
+    implementation 'digital.witte:witte-mobile-library:3.0.0'
 
     // Tapkey SDK
-    api 'com.tapkey.android:Tapkey.MobileLib:2.21.2.2'
+    api 'com.tapkey.android:Tapkey.MobileLib:2.39.3.0'
 
     // Token exchange
     implementation 'net.openid:appauth:0.7.1'
 
     // Test related dependencies
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'androidx.test:runner:1.4.0'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0") {
+            because("kotlin-stdlib-jdk7 is now a part of kotlin-stdlib")
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0") {
+            because("kotlin-stdlib-jdk8 is now a part of kotlin-stdlib")
+        }
+    }
 }
