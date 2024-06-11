@@ -96,7 +96,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
     });
 
     // An ArrayList to store KeyDetails objects
-    private final ArrayList<KeyDetails> _keys = new ArrayList<>();
+    private final ArrayList<KeyDetails> mKeys = new ArrayList<>();
 
     // A TextView to display local keys
     private TextView mTvLocalKeys;
@@ -203,7 +203,7 @@ public class MainFragment extends Fragment implements LifecycleObserver {
         mBtnLogout.setOnClickListener(button -> logout());
 
         mTvBoxId = view.findViewById(R.id.main_frag_et_box_id);
-        mTvBoxId.setHint("e.g. C1-1F-8E-7C");        
+        mTvBoxId.setHint("e.g. C3-49-EE-54");
 
         mBtnTriggerLock = view.findViewById(R.id.main_frag_btn_trigger);
         mBtnTriggerLock.setOnClickListener(button -> triggerLock());
@@ -307,8 +307,8 @@ public class MainFragment extends Fragment implements LifecycleObserver {
             // query for this user's keys
             String userId = mUserManager.getUsers().get(0);
             List<KeyDetails> keys = mKeyManager.getLocalKeys(userId);
-            _keys.clear();
-            _keys.addAll(keys);
+            mKeys.clear();
+            mKeys.addAll(keys);
 
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US);
             sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -450,17 +450,16 @@ public class MainFragment extends Fragment implements LifecycleObserver {
      * Unlocks the box by building an unlock command and executing it.
      */
     private void unlock() {
-        byte[] bytes = BoxCommandBuilder.buildUnlockCarUnlockBox();
+        byte[] bytes = BoxCommandBuilder.buildUnlockCarUnlockBox(true);
         String boxCommandData = Base64.getEncoder().encodeToString(bytes);
         executeBoxCommand(boxCommandData);
     }
 
-    
     /**
      * Locks the box by building a lock box command and executing it.
      */
     private void lock() {
-        byte[] bytes = BoxCommandBuilder.buildLockCarLockBox();
+        byte[] bytes = BoxCommandBuilder.buildLockCarLockBox(true);
         String boxCommandData = Base64.getEncoder().encodeToString(bytes);
         executeBoxCommand(boxCommandData);
     }
@@ -580,6 +579,10 @@ public class MainFragment extends Fragment implements LifecycleObserver {
                                         else {
                                             Log.d(TAG, "Box has been locked");
                                         }
+
+                                        Log.d(TAG, "NFC tag 1 UID: " + boxFeedbackV3.getNfcTag1Uid());
+                                        Log.d(TAG, "NFC tag 2 UID: " + boxFeedbackV3.getNfcTag2Uid());
+                                        Log.d(TAG, "NFC tag 3 UID: " + boxFeedbackV3.getNfcTag3Uid());
                                     }
                                 }
                                 catch (IllegalArgumentException iaEx) {

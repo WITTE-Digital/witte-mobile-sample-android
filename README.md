@@ -86,6 +86,6 @@ public final static int FlinkeyUserId = ...;
 ```
 
 ## More Information
-* flinkey for Developers: https://developers.flinkey.de/
+* flinkey for Developers: https://developers.flinkey.com/
 * Tapkey for Developers: https://developers.tapkey.io/
 * Tapkey Mobile Library Reference Documentation: https://developers.tapkey.io/mobile/android/reference/Tapkey.MobileLib/latest/
